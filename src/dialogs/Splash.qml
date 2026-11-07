@@ -460,12 +460,31 @@ Window {
 
                     Button {
                         id: newProjectButton
-                        text: KI18n.i18n("New Project…")
+                        objectName: "kdencutNewProjectButton"
+                        text: KI18n.i18n("New Project")
+                        implicitHeight: Math.max(80, splash.sizeUnit * 2)
+                        font.pixelSize: Math.max(20, splashFontMetrics.height)
+                        font.bold: true
+                        leftPadding: 24
+                        rightPadding: 24
+                        topPadding: 16
+                        bottomPadding: 16
+                        palette.buttonText: "#ffffff"
+                        icon.color: "#ffffff"
+                        background: Rectangle {
+                            radius: 16
+                            color: !newProjectButton.enabled ? "#52666a"
+                                : newProjectButton.down ? "#087f89"
+                                : newProjectButton.hovered ? "#10a8b4" : "#0996a2"
+                            border.width: newProjectButton.activeFocus ? 3 : 0
+                            border.color: "#ffffff"
+                        }
                         enabled: splash.actionsEnabled
                         icon.name: "document-new"
                         onClicked: splash.openTemplate("")
                         anchors.top: parent.top
                         anchors.left: parent.left
+                        anchors.right: parent.right
                         KeyNavigation.tab: clearHistoryButton
                     }
 

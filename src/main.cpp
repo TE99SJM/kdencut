@@ -50,6 +50,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
+#include <QCursor>
 #include <QDir>
 #include <QIcon>
 #include <QJsonArray>
@@ -371,8 +372,17 @@ int main(int argc, char *argv[])
     parser.addPositionalArgument(QStringLiteral("file"), i18n("Kdenlive document to open."));
     parser.addPositionalArgument(QStringLiteral("rendering"), i18n("Output file for rendered video."));
 
+    QCommandLineOption showCursorOption(QStringLiteral("show-cursor"), i18n("Show the mouse cursor for desktop editing."));
+    parser.addOption(showCursorOption);
+
     // Parse command line
     parser.process(app);
+
+    // KdenCut starts without a pointer for touch and remote touch sessions.
+    // An application override also covers child widgets and QML windows.
+    if (!parser.isSet(showCursorOption)) {
+        QApplication::setOverrideCursor(QCursor(Qt::BlankCursor));
+    }
     aboutData.processCommandLine(&parser);
 
     if (parser.isSet(saveDebugOption)) {
