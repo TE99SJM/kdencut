@@ -1021,7 +1021,6 @@ Window {
                                             text: KI18n.i18n("Resolution")
                                             verticalAlignment: Qt.AlignVCenter
                                             Layout.alignment: Qt.AlignVCenter
-                                            height: profileCombo.height
                                         }
 
                                         ComboBox {
@@ -1052,7 +1051,6 @@ Window {
                                             text: KI18n.i18n("Frame Rate")
                                             verticalAlignment: Qt.AlignVCenter
                                             Layout.alignment: Qt.AlignVCenter
-                                            height: profileCombo.height
                                             enabled: fpsCombo.enabled
                                         }
 
