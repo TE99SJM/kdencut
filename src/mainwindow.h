@@ -6,6 +6,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 
 #pragma once
 
+#include <QByteArray>
 #include <QComboBox>
 #ifndef NODBUS
 #include <QDBusAbstractAdaptor>
@@ -118,6 +119,8 @@ public:
                        const QString &category);
 
     void processRestoreState(const QByteArray &state);
+    /** @brief Persist the desktop workspace, not a temporary phone layout. */
+    QByteArray layoutForSaving() const;
 
     /**
      * @brief Adds a new dock widget to this window.
@@ -264,6 +267,11 @@ private:
     OtioImport *m_otioImport{nullptr};
     KColorSchemeManager *m_colorschemes;
     ScopeManager *m_scopesManager{nullptr};
+    void updateTouchLayout();
+    QByteArray m_touchWideLayout;
+    bool m_touchCompactLayout{false};
+    bool m_touchMenuWasVisible{true};
+    Qt::ToolButtonStyle m_touchToolButtonStyle{Qt::ToolButtonFollowStyle};
     KDDockWidgets::QtWidgets::MainWindow *mainDockWindow;
     KDDockWidgets::QtWidgets::DockWidget *m_timelineDock{nullptr};
     KDDockWidgets::QtWidgets::DockWidget *m_projectBinDock{nullptr};

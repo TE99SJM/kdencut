@@ -5,6 +5,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 */
 
 #include "mainwindow.h"
+#include "kdencut/touchmode.h"
 #include "assets/assetpanel.hpp"
 #include "audiomixer/mixermanager.hpp"
 #include "bin/clipcreator.hpp"
@@ -117,6 +118,8 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include <QProxyStyle>
 #include <QPushButton>
 #include <QScreen>
+#include <QTimer>
+#include <QWindow>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QStyleFactory>
@@ -769,6 +772,16 @@ void MainWindow::init()
 void MainWindow::finishUiSetup()
 {
     pCore->restoreLayout();
+    // Watch the screen, rather than the window: a desktop dock layout can impose
+    // a window minimum wider than the remote screen after a phone rotates.
+    for (QScreen *display : QGuiApplication::screens()) {
+        connect(display, &QScreen::availableGeometryChanged, this, [this]() { updateTouchLayout(); });
+    }
+    connect(KdenCut::TouchMode::instance(), &KdenCut::TouchMode::touchEnabledChanged, this, [this]() { updateTouchLayout(); });
+    if (windowHandle()) {
+        connect(windowHandle(), &QWindow::screenChanged, this, [this]() { updateTouchLayout(); });
+    }
+    updateTouchLayout();
     Q_EMIT pCore->closeSplash();
     setAutoSaveSettings();
     QObject::disconnect(pCore.get(), &Core::GUISetupDone, this, nullptr);
@@ -930,11 +943,14 @@ bool MainWindow::queryClose()
         }
     }
     // WARNING: According to KMainWindow::queryClose documentation we are not supposed to close the document here?
-    KDDockWidgets::LayoutSaver dockLayout(KDDockWidgets::RestoreOption_AbsoluteFloatingDockWindows);
-    KdenliveSettings::setKdockLayout(QString(dockLayout.serializeLayout()));
+    KdenliveSettings::setKdockLayout(QString(layoutForSaving()));
     // setAutoSaveSettings(QStringLiteral("MainWindow"), false);
     if (!pCore->projectManager()->closeCurrentDocument(true, true)) {
         return false;
+    }
+    if (m_touchCompactLayout) {
+        menuBar()->setVisible(m_touchMenuWasVisible);
+        toolBar()->setToolButtonStyle(m_touchToolButtonStyle);
     }
     saveOptions();
     m_windowClosing = true;
@@ -4435,10 +4451,62 @@ void MainWindow::slotCreateRangeMarkerFromZoneQuick()
     }
 }
 
+QByteArray MainWindow::layoutForSaving() const
+{
+    if (m_touchCompactLayout) {
+        return m_touchWideLayout;
+    }
+    KDDockWidgets::LayoutSaver saver(KDDockWidgets::RestoreOption_AbsoluteFloatingDockWindows);
+    return saver.serializeLayout();
+}
+
+void MainWindow::updateTouchLayout()
+{
+    QScreen *display = screen();
+    if (!display || !m_projectMonitorDock || !m_timelineDock) {
+        return;
+    }
+    const QSize available = display->availableSize();
+    const bool compact = KdenliveSettings::touchmode() && (available.width() < 1100 || available.width() < available.height());
+    if (compact == m_touchCompactLayout) {
+        return;
+    }
+    KDDockWidgets::LayoutSaver saver(KDDockWidgets::RestoreOption_RelativeToMainWindow);
+    // Set this first because moving docks can deliver nested geometry events.
+    m_touchCompactLayout = compact;
+    if (compact) {
+        m_touchWideLayout = saver.serializeLayout();
+        m_touchMenuWasVisible = !menuBar()->isHidden();
+        m_touchToolButtonStyle = toolBar()->toolButtonStyle();
+        if (!toolBar()->actions().contains(m_hamburgerMenu)) {
+            toolBar()->insertAction(toolBar()->actions().value(0), m_hamburgerMenu);
+        }
+        m_hamburgerMenu->hideActionsOf(toolBar());
+        toolBar()->setToolButtonStyle(Qt::ToolButtonIconOnly);
+        menuBar()->hide();
+        // One tabbed workspace above the timeline instead of several columns
+        // whose combined minimum widths push the preview off the phone screen.
+        const QList<KDDockWidgets::QtWidgets::DockWidget *> panels = {
+            m_projectBinDock, m_clipMonitorDock, m_effectListDock, m_compositionListDock, m_effectStackDock};
+        for (auto *dock : panels) {
+            m_projectMonitorDock->addDockWidgetAsTab(dock);
+        }
+        m_projectMonitorDock->open();
+        m_projectMonitorDock->setAsCurrentTab();
+    } else {
+        saver.restoreLayout(m_touchWideLayout);
+        m_touchWideLayout.clear();
+        menuBar()->setVisible(m_touchMenuWasVisible);
+        toolBar()->setToolButtonStyle(m_touchToolButtonStyle);
+    }
+    // Reapply maximization against the new dock minimum after the layout settles.
+    QTimer::singleShot(0, this, [this]() { showMaximized(); });
+}
+
 QSize MainWindow::sizeHint() const
 {
     const QSize desktopSize = QGuiApplication::primaryScreen()->availableSize();
-    return KXmlGuiWindow::sizeHint().expandedTo(desktopSize * 0.8);
+    return KXmlGuiWindow::sizeHint().expandedTo(desktopSize * 0.8).boundedTo(desktopSize);
 }
 
 void MainWindow::slotEditToolbars()

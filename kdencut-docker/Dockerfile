@@ -64,6 +64,7 @@ RUN \
 
 # Autostart KdenCut in the web desktop
 COPY kdencut-docker/root /
+RUN python3 /usr/local/share/kdencut/install-web-ui.py
 
 EXPOSE 3000 3001
 VOLUME /config

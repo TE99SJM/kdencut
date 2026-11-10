@@ -59,10 +59,24 @@ Window {
     color: "transparent"
     flags: Qt.Window | Qt.FramelessWindowHint
     title: "Kdenlive"
-    minimumWidth: splashContent.implicitWidth
-    minimumHeight: splashContent.implicitHeight
-    width: splashContent.implicitWidth
-    height: splashContent.implicitHeight
+    // The welcome screen must also fit a resized remote desktop / phone.
+    minimumWidth: Math.min(320, Screen.width)
+    minimumHeight: Math.min(240, Screen.height)
+    width: Math.min(splashContent.implicitWidth, Screen.width - 16)
+    height: Math.min(splashContent.implicitHeight, Screen.height - 16)
+    readonly property bool narrow: width < splash.sizeUnit * 17
+
+    function fitScreen() {
+        width = Math.min(splashContent.implicitWidth, Screen.width - 16)
+        height = Math.min(splashContent.implicitHeight, Screen.height - 16)
+        x = Math.max(0, Math.round((Screen.width - width) / 2))
+        y = Math.max(0, Math.round((Screen.height - height) / 2))
+    }
+    Connections {
+        target: splash.screen
+        function onWidthChanged() { splash.fitScreen() }
+        function onHeightChanged() { splash.fitScreen() }
+    }
 
     onClosing: function(close) {
       close.accepted = true
@@ -197,7 +211,7 @@ Window {
 
         Item {
             id: header
-            height: splashContent.height / 3
+            height: Math.min(splashContent.height / 4, splash.sizeUnit * 4)
             anchors.left: parent.left
             anchors.right: parent.right
 
@@ -836,280 +850,316 @@ Window {
                 anchors.margins: 10
                 spacing: 10
 
-                ColumnLayout {
+                ScrollView {
+                    id: setupScroll
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.alignment: Qt.AlignTop
-                    Label {
-                        Layout.fillWidth: true
-                        textFormat: Text.StyledText
-                        horizontalAlignment: Text.AlignJustify
-                        text: KI18n.i18n("<h3>Welcome to Kdenlive Quick Setup</h3>")
-                    }
+                    contentWidth: availableWidth
+                    contentHeight: setupForm.implicitHeight
+                    clip: true
+                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
-                    Switch {
-                        id: themeSwitch
-                        enabled: !splash.crashRecovery
-                        text: KI18n.i18n("Always Use Dark Color Theme")
-                        checked: true
-                        onCheckedChanged: {
-                            splash.switchPalette(checked);
-                        }
-                    }
-
-                    Label {
-                        Layout.fillWidth: true
-                        textFormat: Text.StyledText
-                        horizontalAlignment: Text.AlignJustify
-                        wrapMode: Text.WordWrap
-                        text: KI18n.i18n("<b>Default Project Profile</b>")
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.minimumHeight: childrenRect.height + 2 * 14
-                        radius: 5
-                        color: Qt.darker(splashContent.color, 1.4)
-
-                        RowLayout {
-                            id: profileRow
-                            anchors.top: parent.top
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.margins: 14
-                            spacing: 20
-
-                            ColumnLayout {
-                                Layout.fillWidth: false
-                                // Layout.preferredWidth: horizontalFrame.implicitWidth
-
-                                Rectangle {
-                                    id: horizontalFrame
-                                    implicitHeight: buttonNext.height * 1.4
-                                    implicitWidth: horizontalFrame.implicitHeight * 16 / 9
-                                    Layout.alignment: Qt.AlignHCenter
-                                    radius: 5
-                                    property bool checked: true
-                                    property int lastIndex: -1
-                                    property int lastFpsIndex: -1
-                                    border.color: checked ? activePalette.highlight : horizontalArea.containsMouse ? activePalette.highlight : activePalette.text
-                                    border.width: checked ? 3 : horizontalArea.containsMouse ? 2 : 1
-                                    color: checked ? splashContent.color : Qt.darker(splashContent.color, 1.2)
-                                    opacity: checked ? 1 : 0.5
-
-                                    MouseArea {
-                                        id: horizontalArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            verticalFrame.lastIndex = profileCombo.currentIndex
-                                            verticalFrame.lastFpsIndex = fpsCombo.currentIndex
-                                            horizontalFrame.checked = true
-                                            verticalFrame.checked = false
-                                            if (horizontalFrame.lastIndex > -1) {
-                                                profileCombo.currentIndex = horizontalFrame.lastIndex
-                                            }
-                                            if (horizontalFrame.lastFpsIndex > -1) {
-                                                fpsCombo.currentIndex = horizontalFrame.lastFpsIndex
-                                            }
-                                        }
-                                    }
-
-                                }
-
-                                Label {
-                                    id: horizontalLabel
-                                    text: KI18n.i18n("Horizontal")
-                                    Layout.alignment: Qt.AlignHCenter
-                                    font.bold: horizontalFrame.checked
-                                }
-
-                            }
-
-                            ColumnLayout {
-                                Layout.fillWidth: false
-
-                                Rectangle {
-                                    id: verticalFrame
-                                    implicitHeight: horizontalFrame.implicitHeight
-                                    implicitWidth: verticalFrame.implicitHeight * 9 / 16
-                                    Layout.alignment: Qt.AlignHCenter
-                                    radius: 5
-                                    property bool checked: false
-                                    property int lastIndex: -1
-                                    property int lastFpsIndex: -1
-                                    border.color: checked ? activePalette.highlight : verticalArea.containsMouse ? activePalette.highlight : activePalette.text
-                                    border.width: checked ? 3 : verticalArea.containsMouse ? 2 : 1
-                                    color: checked ? splashContent.color : Qt.darker(splashContent.color, 1.2)
-                                    opacity: checked ? 1 : 0.5
-
-                                    MouseArea {
-                                        id: verticalArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            horizontalFrame.lastIndex = profileCombo.currentIndex
-                                            horizontalFrame.lastFpsIndex = fpsCombo.currentIndex
-                                            horizontalFrame.checked = false
-                                            verticalFrame.checked = true
-                                            if (verticalFrame.lastIndex > -1) {
-                                                profileCombo.currentIndex = verticalFrame.lastIndex
-                                            }
-                                            if (verticalFrame.lastFpsIndex > -1) {
-                                                fpsCombo.currentIndex = verticalFrame.lastFpsIndex
-                                            }
-                                        }
-                                    }
-
-                                }
-
-                                Label {
-                                    id: vLabel
-                                    text: KI18n.i18n("Vertical")
-                                    Layout.alignment: Qt.AlignHCenter
-                                    font.bold: verticalFrame.checked
-                                }
-
-                            }
-
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                Row {
-                                    spacing: 10
-                                    Label {
-                                        text: KI18n.i18n("Resolution")
-                                        verticalAlignment: Qt.AlignVCenter
-                                        Layout.alignment: Qt.AlignVCenter
-                                        height: profileCombo.height
-                                    }
-
-                                    ComboBox {
-                                        id: profileCombo
-                                        // profile value is: width x height x colorspace x sarNum x sarDen x darNum x darDen
-                                        model: horizontalFrame.checked ? splash.horizontalModel : splash.verticalModel
-                                        textRole: "text"
-                                        valueRole: "value"
-                                        property bool sdProfile: horizontalFrame.checked && (currentValue.startsWith("720x480x") || currentValue.startsWith("720x576x"))
-                                        Component.onCompleted: {
-                                            let index = indexOfValue("1920x1080x709x1x1x16x9");
-                                            if (index >= 0) {
-                                                currentIndex = index
-                                            }
-                                        }
-                                    }
-
-                                }
-
-                                Row {
-                                    spacing: 10
-
-                                    Label {
-                                        text: KI18n.i18n("Frame Rate")
-                                        verticalAlignment: Qt.AlignVCenter
-                                        Layout.alignment: Qt.AlignVCenter
-                                        height: profileCombo.height
-                                        enabled: fpsCombo.enabled
-                                    }
-
-                                    ComboBox {
-                                        id: fpsCombo
-                                        model: horizontalFrame.checked ? splash.horizontalFpsModel : splash.verticalFpsModel
-                                        textRole: "text"
-                                        valueRole: "value"
-                                        Component.onCompleted: {
-                                            let index = indexOfValue(splash.palFps ? "25" : horizontalFrame.checked ? "24000/1001" : "30");
-                                            if (index >= 0) {
-                                                currentIndex = index
-                                            }
-                                        }
-                                    }
-
-                                }
-
-                                Row {
-                                    spacing: 10
-                                    Switch {
-                                        id: interlacedSwitch
-                                        text: KI18n.i18n("Interlaced")
-                                        enabled: !profileCombo.sdProfile && horizontalFrame.checked
-                                    }
-
-                                }
-
-                            }
-
-                        }
-
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
+                    ColumnLayout {
+                        id: setupForm
+                        width: setupScroll.availableWidth
                         spacing: 10
                         Label {
-                            text: KI18n.i18n("Video Tracks")
-                            Layout.alignment: Qt.AlignVCenter
+                            Layout.fillWidth: true
+                            textFormat: Text.StyledText
+                            wrapMode: Text.WordWrap
+                            horizontalAlignment: Text.AlignLeft
+                            text: KI18n.i18n("<h3>Welcome to Kdenlive Quick Setup</h3>")
                         }
-                        SpinBox {
-                            id: vTracks
-                            value: 2
 
+                        Switch {
+                            id: themeSwitch
+                            Layout.fillWidth: true
+                            Layout.minimumWidth: 0
+                            contentItem: Label {
+                                text: themeSwitch.text
+                                font: themeSwitch.font
+                                leftPadding: themeSwitch.indicator.width + themeSwitch.spacing
+                                verticalAlignment: Text.AlignVCenter
+                                wrapMode: Text.WordWrap
+                            }
+                            enabled: !splash.crashRecovery
+                            text: KI18n.i18n("Always Use Dark Color Theme")
+                            checked: true
+                            onCheckedChanged: {
+                                splash.switchPalette(checked);
+                            }
                         }
+
                         Label {
-                            text: KI18n.i18n("Audio Tracks")
-                            Layout.alignment: Qt.AlignVCenter
+                            Layout.fillWidth: true
+                            textFormat: Text.StyledText
+                            horizontalAlignment: Text.AlignJustify
+                            wrapMode: Text.WordWrap
+                            text: KI18n.i18n("<b>Default Project Profile</b>")
                         }
-                        SpinBox {
-                            id: aTracks
-                            value: 2
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: profileRow.implicitHeight + 28
+                            radius: 5
+                            color: Qt.darker(splashContent.color, 1.4)
+
+                            GridLayout {
+                                id: profileRow
+                                columns: splash.narrow ? 2 : 3
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.margins: 14
+                                rowSpacing: 20
+                                columnSpacing: 20
+
+                                ColumnLayout {
+                                    Layout.fillWidth: false
+                                    // Layout.preferredWidth: horizontalFrame.implicitWidth
+
+                                    Rectangle {
+                                        id: horizontalFrame
+                                        implicitHeight: splash.sizeUnit * 1.4
+                                        implicitWidth: horizontalFrame.implicitHeight * 16 / 9
+                                        Layout.alignment: Qt.AlignHCenter
+                                        radius: 5
+                                        property bool checked: true
+                                        property int lastIndex: -1
+                                        property int lastFpsIndex: -1
+                                        border.color: checked ? activePalette.highlight : horizontalArea.containsMouse ? activePalette.highlight : activePalette.text
+                                        border.width: checked ? 3 : horizontalArea.containsMouse ? 2 : 1
+                                        color: checked ? splashContent.color : Qt.darker(splashContent.color, 1.2)
+                                        opacity: checked ? 1 : 0.5
+
+                                        MouseArea {
+                                            id: horizontalArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                verticalFrame.lastIndex = profileCombo.currentIndex
+                                                verticalFrame.lastFpsIndex = fpsCombo.currentIndex
+                                                horizontalFrame.checked = true
+                                                verticalFrame.checked = false
+                                                if (horizontalFrame.lastIndex > -1) {
+                                                    profileCombo.currentIndex = horizontalFrame.lastIndex
+                                                }
+                                                if (horizontalFrame.lastFpsIndex > -1) {
+                                                    fpsCombo.currentIndex = horizontalFrame.lastFpsIndex
+                                                }
+                                            }
+                                        }
+
+                                    }
+
+                                    Label {
+                                        id: horizontalLabel
+                                        text: KI18n.i18n("Horizontal")
+                                        Layout.alignment: Qt.AlignHCenter
+                                        font.bold: horizontalFrame.checked
+                                    }
+
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: false
+
+                                    Rectangle {
+                                        id: verticalFrame
+                                        implicitHeight: horizontalFrame.implicitHeight
+                                        implicitWidth: verticalFrame.implicitHeight * 9 / 16
+                                        Layout.alignment: Qt.AlignHCenter
+                                        radius: 5
+                                        property bool checked: false
+                                        property int lastIndex: -1
+                                        property int lastFpsIndex: -1
+                                        border.color: checked ? activePalette.highlight : verticalArea.containsMouse ? activePalette.highlight : activePalette.text
+                                        border.width: checked ? 3 : verticalArea.containsMouse ? 2 : 1
+                                        color: checked ? splashContent.color : Qt.darker(splashContent.color, 1.2)
+                                        opacity: checked ? 1 : 0.5
+
+                                        MouseArea {
+                                            id: verticalArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                horizontalFrame.lastIndex = profileCombo.currentIndex
+                                                horizontalFrame.lastFpsIndex = fpsCombo.currentIndex
+                                                horizontalFrame.checked = false
+                                                verticalFrame.checked = true
+                                                if (verticalFrame.lastIndex > -1) {
+                                                    profileCombo.currentIndex = verticalFrame.lastIndex
+                                                }
+                                                if (verticalFrame.lastFpsIndex > -1) {
+                                                    fpsCombo.currentIndex = verticalFrame.lastFpsIndex
+                                                }
+                                            }
+                                        }
+
+                                    }
+
+                                    Label {
+                                        id: vLabel
+                                        text: KI18n.i18n("Vertical")
+                                        Layout.alignment: Qt.AlignHCenter
+                                        font.bold: verticalFrame.checked
+                                    }
+
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    Layout.columnSpan: splash.narrow ? 2 : 1
+                                    Layout.minimumWidth: 0
+                                    GridLayout {
+                                        Layout.fillWidth: true
+                                        columns: splash.width < 480 ? 1 : 2
+                                        columnSpacing: 10
+                                        Label {
+                                            text: KI18n.i18n("Resolution")
+                                            verticalAlignment: Qt.AlignVCenter
+                                            Layout.alignment: Qt.AlignVCenter
+                                            height: profileCombo.height
+                                        }
+
+                                        ComboBox {
+                                            id: profileCombo
+                                            Layout.fillWidth: true
+                                            Layout.minimumWidth: 0
+                                            // profile value is: width x height x colorspace x sarNum x sarDen x darNum x darDen
+                                            model: horizontalFrame.checked ? splash.horizontalModel : splash.verticalModel
+                                            textRole: "text"
+                                            valueRole: "value"
+                                            property bool sdProfile: horizontalFrame.checked && (currentValue.startsWith("720x480x") || currentValue.startsWith("720x576x"))
+                                            Component.onCompleted: {
+                                                let index = indexOfValue("1920x1080x709x1x1x16x9");
+                                                if (index >= 0) {
+                                                    currentIndex = index
+                                                }
+                                            }
+                                        }
+
+                                    }
+
+                                    GridLayout {
+                                        Layout.fillWidth: true
+                                        columns: splash.width < 480 ? 1 : 2
+                                        columnSpacing: 10
+
+                                        Label {
+                                            text: KI18n.i18n("Frame Rate")
+                                            verticalAlignment: Qt.AlignVCenter
+                                            Layout.alignment: Qt.AlignVCenter
+                                            height: profileCombo.height
+                                            enabled: fpsCombo.enabled
+                                        }
+
+                                        ComboBox {
+                                            id: fpsCombo
+                                            Layout.fillWidth: true
+                                            Layout.minimumWidth: 0
+                                            model: horizontalFrame.checked ? splash.horizontalFpsModel : splash.verticalFpsModel
+                                            textRole: "text"
+                                            valueRole: "value"
+                                            Component.onCompleted: {
+                                                let index = indexOfValue(splash.palFps ? "25" : horizontalFrame.checked ? "24000/1001" : "30");
+                                                if (index >= 0) {
+                                                    currentIndex = index
+                                                }
+                                            }
+                                        }
+
+                                    }
+
+                                    Row {
+                                        spacing: 10
+                                        Switch {
+                                            id: interlacedSwitch
+                                            text: KI18n.i18n("Interlaced")
+                                            enabled: !profileCombo.sdProfile && horizontalFrame.checked
+                                        }
+
+                                    }
+
+                                }
+
+                            }
+
                         }
-                    }
 
-                    Label {
-                        Layout.fillWidth: true
-                        wrapMode: Text.WordWrap
-                        text: KI18n.i18n("This can always be changed later in the Settings.")
-                        font.italic: true
-                    }
-                    Rectangle {
-                        // Crash recovery
-                        visible: splash.crashRecovery
-                        Layout.fillWidth: true
-                        Layout.minimumHeight: crashRecoveryLayout.implicitHeight + radius * 2
-
-                        color: "#22FF0000"
-                        radius: 5
-
-                        RowLayout {
-                            id: crashRecoveryLayout
-                            anchors.fill: parent
-                            anchors.leftMargin: parent.radius * 2
-                            anchors.rightMargin: parent.radius * 2
+                        GridLayout {
+                            Layout.fillWidth: true
+                            columns: splash.width < 480 ? 1 : splash.narrow ? 2 : 4
+                            columnSpacing: 10
                             Label {
-                                id: restartWelcomeLabel
-                                text: KI18n.i18n("Kdenlive crashed on last start. Reset config and restart?")
+                                text: KI18n.i18n("Video Tracks")
                                 Layout.alignment: Qt.AlignVCenter
-                                wrapMode: Text.Wrap
                             }
-                            Button {
-                                id: restartWelcomeButton
-                                enabled: splash.actionsEnabled
-                                text: KI18n.i18n("Reset")
-                                icon.name: "view-refresh"
-                                Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
-                                onClicked: splash.resetConfig()
+                            SpinBox {
+                                id: vTracks
+                                value: 2
+
+                            }
+                            Label {
+                                text: KI18n.i18n("Audio Tracks")
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+                            SpinBox {
+                                id: aTracks
+                                value: 2
                             }
                         }
-                    }
 
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: KI18n.i18n("This can always be changed later in the Settings.")
+                            font.italic: true
+                        }
+                        Rectangle {
+                            // Crash recovery
+                            visible: splash.crashRecovery
+                            Layout.fillWidth: true
+                            Layout.minimumHeight: crashRecoveryLayout.implicitHeight + radius * 2
+
+                            color: "#22FF0000"
+                            radius: 5
+
+                            RowLayout {
+                                id: crashRecoveryLayout
+                                anchors.fill: parent
+                                anchors.leftMargin: parent.radius * 2
+                                anchors.rightMargin: parent.radius * 2
+                                Label {
+                                    id: restartWelcomeLabel
+                                    text: KI18n.i18n("Kdenlive crashed on last start. Reset config and restart?")
+                                    Layout.alignment: Qt.AlignVCenter
+                                    wrapMode: Text.Wrap
+                                }
+                                Button {
+                                    id: restartWelcomeButton
+                                    enabled: splash.actionsEnabled
+                                    text: KI18n.i18n("Reset")
+                                    icon.name: "view-refresh"
+                                    Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
+                                    onClicked: splash.resetConfig()
+                                }
+                            }
+                        }
+
+                    }
                 }
 
-                RowLayout {
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: splash.narrow ? 1 : 2
                     Button {
                         id: buttonHelp
+                        Layout.fillWidth: splash.narrow
                         icon.name: "help-browser"
-                        text: KI18n.i18n("Check Online Documentation")
+                        text: KI18n.i18n("Documentation")
                         enabled: splash.actionsEnabled
                         Layout.alignment: Qt.AlignLeft
                         onClicked: splash.openLink("https://docs.kdenlive.org?utm_campaign=kdenlive_inapp&utm_term=splash_documentation&utm_content=" + splash.version)
@@ -1117,6 +1167,7 @@ Window {
 
                     Button {
                         id: buttonNext
+                        Layout.fillWidth: splash.narrow
                         icon.name: "go-next"
                         text: KI18n.i18n("Start Editing")
                         enabled: splash.actionsEnabled
