@@ -1565,7 +1565,8 @@ void MainWindow::connectDocument()
     }
 
     m_buttonSelectTool->setChecked(true);
-    connect(m_projectMonitorDock, &KDDockWidgets::QtWidgets::DockWidget::isOpenChanged, this, [this](bool visible) {
+    QObject::disconnect(m_monitorDockVisibilityConnection);
+    m_monitorDockVisibilityConnection = connect(m_projectMonitorDock, &KDDockWidgets::QtWidgets::DockWidget::isOpenChanged, this, [this](bool visible) {
         // The mobile workspace owns the visible monitor while its desktop dock is closed.
         if (!m_touchCompactLayout) {
             m_projectMonitor->slotRefreshMonitor(visible);
@@ -4630,7 +4631,12 @@ void MainWindow::closeTouchPanel()
 
 void MainWindow::showTouchPanel(KDDockWidgets::QtWidgets::DockWidget *dock)
 {
-    if (!m_mobileWorkspace || !dock || dock == m_touchPanelDock || dock == m_projectMonitorDock || dock == m_timelineDock) {
+    if (!m_mobileWorkspace || !dock || dock == m_projectMonitorDock || dock == m_timelineDock) {
+        return;
+    }
+    if (dock == m_touchPanelDock) {
+        dock->close();
+        m_mobileWorkspace->showEditor();
         return;
     }
     closeTouchPanel();
@@ -4658,15 +4664,34 @@ void MainWindow::importTouchMedia(bool audio, bool title)
     if (!tracks.contains(track)) {
         track = tracks.isEmpty() ? -1 : tracks.first();
     }
-    if (track < 0) {
+    if (track < 0 && !audio && !title) {
         return;
     }
     const auto frame = std::make_shared<int>(m_projectMonitor->position());
+    const auto destination = std::make_shared<int>(audio || title ? -1 : track);
     // Capture the timeline, not the active project: imports finish asynchronously.
     // A closed/switched project must never receive the imported media by accident.
-    pCore->bin()->setReadyCallBack([target = QPointer<TimelineWidget>(timeline), track, frame](const QString &clipId) {
+    pCore->bin()->setReadyCallBack([target = QPointer<TimelineWidget>(timeline), destination, frame, audio, title](const QString &clipId) {
         if (target && target->model()) {
-            const auto inserted = target->controller()->insertClips(track, *frame, QStringList(clipId), true, true);
+            const auto candidates = target->model()->getTracksIds(audio);
+            if ((audio || title) && !candidates.contains(*destination)) {
+                // Music and titles are layers, so do not collide with the video's
+                // existing picture or sound. Only add a track after import succeeds.
+                *destination = -1;
+                for (int candidate : candidates) {
+                    if (target->model()->getTrackClipsCount(candidate) == 0
+                        && target->model()->getTrackProperty(candidate, QStringLiteral("kdenlive:locked")).toInt() == 0) {
+                        *destination = candidate;
+                        break;
+                    }
+                }
+                if (*destination < 0 && !target->model()->requestTrackInsertion(audio ? 0 : -1, *destination, audio ? i18n("Audio") : i18n("Text"), audio)) {
+                    return;
+                }
+            } else if (!candidates.contains(*destination)) {
+                return;
+            }
+            const auto inserted = target->controller()->insertClips(*destination, *frame, QStringList(clipId), true, true);
             for (int id : inserted) {
                 *frame = qMax(*frame, target->model()->getClipPosition(id) + target->model()->getClipPlaytime(id));
             }
@@ -4700,7 +4725,9 @@ void MainWindow::touchCommand(const QString &name)
         actionCollection()->action(QStringLiteral("add_subtitle"))->trigger();
     } else if (name == QLatin1String("new")) {
         pCore->projectManager()->newFile(false);
-        m_mobileWorkspace->showEditor();
+        if (m_mobileWorkspace) {
+            m_mobileWorkspace->showEditor();
+        }
     } else if (name == QLatin1String("edit")) {
         closeTouchPanel();
     } else if (name == QLatin1String("insert")) {

@@ -188,11 +188,14 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
     homeLayout->addWidget(button(tr("Continue editing"), QStringLiteral("go-next"), QStringLiteral("continue")));
     homeLayout->addStretch();
     homeLayout->addWidget(actionButton(QStringLiteral("kdencut_touch_mode"), tr("Desktop controls"), QStringLiteral("video-display")));
-    m_pages->addWidget(homePage);
-    connect(this, &MobileWorkspace::command, this, [this, homePage](const QString &name) {
+    auto *homeScroll = new QScrollArea;
+    homeScroll->setWidgetResizable(true);
+    homeScroll->setWidget(homePage);
+    m_pages->addWidget(homeScroll);
+    connect(this, &MobileWorkspace::command, this, [this, homeScroll](const QString &name) {
         if (name == QLatin1String("home")) {
             Q_EMIT panelClosed();
-            m_pages->setCurrentWidget(homePage);
+            m_pages->setCurrentWidget(homeScroll);
         } else if (name == QLatin1String("continue")) {
             showEditor();
         } else if (name == QLatin1String("done")) {

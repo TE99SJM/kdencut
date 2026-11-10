@@ -278,6 +278,7 @@ private:
     QByteArray m_touchWideLayout;
     bool m_touchCompactLayout{false};
     bool m_touchMovingWidgets{false};
+    QMetaObject::Connection m_monitorDockVisibilityConnection;
     Qt::WindowStates m_touchWindowState;
     QList<QPointer<QWidget>> m_touchHiddenWidgets;
     KdenCut::MobileWorkspace *m_mobileWorkspace{nullptr};

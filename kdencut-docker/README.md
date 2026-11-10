@@ -57,6 +57,8 @@ Audio, Text, Effects, Adjust, Captions and Transitions. Save and Export stay at 
 top, with playback and undo/redo below the preview. Timeline commands include Add,
 Split, Delete, Duplicate and Fit. Importing media inserts it into the active
 matching track; the Media sheet can also insert selected bin clips.
+Audio and Text imports use an empty matching track, creating one when needed,
+so added music and titles do not collide with existing clips.
 
 The mobile home has New video, portrait/landscape format selection, Open project,
 and recent projects. Home inside the editor offers Continue editing and Desktop

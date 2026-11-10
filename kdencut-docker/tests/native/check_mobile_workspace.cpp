@@ -148,6 +148,23 @@ private Q_SLOTS:
         QCOMPARE(commandSpy.last().at(0).toString(), QStringLiteral("media"));
         workspace.findChild<QToolButton *>(QStringLiteral("mobile_home"))->click();
         QVERIFY(workspace.findChild<QToolButton *>(QStringLiteral("mobileNew"))->isVisible());
+        workspace.resize(430, 344);
+        QTest::qWait(20);
+        QCOMPARE(workspace.size(), QSize(430, 344));
+        auto *resume = workspace.findChild<QToolButton *>(QStringLiteral("mobile_continue"));
+        QScrollArea *homeScroll = nullptr;
+        for (auto *scroll : workspace.findChildren<QScrollArea *>()) {
+            if (scroll->isVisible() && scroll->isAncestorOf(resume)) {
+                homeScroll = scroll;
+                break;
+            }
+        }
+        QVERIFY(homeScroll);
+        homeScroll->ensureWidgetVisible(resume);
+        QTest::qWait(20);
+        QVERIFY(homeScroll->viewport()->rect().contains(QRect(resume->mapTo(homeScroll->viewport(), QPoint()), resume->size())));
+        resume->click();
+        QVERIFY(preview->isVisible());
         workspace.showEditor();
         QVERIFY(preview->isVisible());
     }
