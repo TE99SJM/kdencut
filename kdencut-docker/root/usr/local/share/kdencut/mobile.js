@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL */
 (() => {
-  // Mobile remote desktops need enough logical pixels for a video editor.
+  // Match phone CSS pixels to the native mobile workspace, at 96 DPI.
   // Use Selkies' own fit and input mapping; never scale just its video canvas.
   const touch = window.matchMedia('(pointer: coarse)');
   const root = document.documentElement;
@@ -28,7 +28,7 @@
     const box = container.getBoundingClientRect();
     if (box.width <= 0 || box.height <= 0) return;
     // A visible keyboard should reduce the display area, not crop its bottom.
-    const scale = Math.max(1, 960 / box.width, 640 / box.height);
+    const scale = Math.max(1, 320 / box.width, 280 / box.height);
     const w = Math.ceil(box.width * scale / 2) * 2;
     const h = Math.ceil(box.height * scale / 2) * 2;
     const size = `${w}x${h}`;
@@ -40,7 +40,7 @@
       settings.manual_width?.value > 0 || settings.manual_height?.value > 0;
     if (!lockedSize) send({ type: 'setManualResolution', width: w, height: h });
     // Send after manual resolution: its derived HiDPI default must not enlarge
-    // the Qt UI again, undoing the minimum logical workspace above.
+    // the Qt UI again, undoing the phone-sized workspace above.
     const dpi = settings.scaling_dpi;
     if (!dpi?.locked && (!dpi?.allowed || dpi.allowed.some((value) => Number(value) === 96))) {
       send({ type: 'settings', settings: { scaling_dpi: 96 } });

@@ -45,15 +45,29 @@ cd ~/kdencut/kdencut-docker && docker compose down
 
 Touch clients reserve a separate bottom strip for the keyboard button and fit the
 stream to Safari's visible viewport, including rotation and the software keyboard.
-The logical desktop stays at least 960×640 at 96 DPI so native dialogs are not
-larger than the screen. Selkies scales the stream and pointer coordinates together.
-Administrator-pinned resolution/DPI settings are respected.
+The streamed desktop now uses phone-sized logical pixels at 96 DPI (minimum
+320×280). It no longer creates a 960-pixel desktop and shrinks its controls.
+Selkies scales the stream and pointer coordinates together. Administrator-pinned
+resolution/DPI settings are respected.
 
-In touch mode, narrow or portrait desktops put the bin, monitors, effects and
-composition stack in one tabbed workspace above the timeline. The menu is available
-through the toolbar's hamburger button. A wider landscape screen restores the
-previous dock arrangement; saving a project retains that desktop arrangement.
-Quick Setup reflows and scrolls, while its Start Editing button stays below the form.
+With Touch Mode enabled, screens narrower than 1100 pixels or in portrait use a
+full-screen mobile workspace. The project preview sits above the timeline in
+portrait; landscape places them side by side. A swipeable bottom strip opens Media,
+Audio, Text, Effects, Adjust, Captions and Transitions. Save and Export stay at the
+top, with playback and undo/redo below the preview. Timeline commands include Add,
+Split, Delete, Duplicate and Fit. Importing media inserts it into the active
+matching track; the Media sheet can also insert selected bin clips.
+
+The mobile home has New video, portrait/landscape format selection, Open project,
+and recent projects. Home inside the editor offers Continue editing and Desktop
+controls. Secondary dock panels open as scrollable sheets. Oversized desktop
+forms, including export settings, scroll within the available screen. Advanced
+forms still use their existing Kdenlive controls.
+
+A wide landscape screen or disabling Touch Mode restores the previous desktop
+layout. Project saves retain that desktop layout; loading projects and changing
+project aspect ratio cannot restore desktop docks over the phone workspace.
+Quick Setup and recovery screens remain available.
 
 Rebuild the image after pulling this change and reload the browser page to load the
 new viewport adapter. No configuration reset is needed. This does not install the
@@ -65,8 +79,16 @@ Developer checks:
 node --test kdencut-docker/tests/test_mobile_logic.cjs
 python kdencut-docker/tests/check_splash.py        # requires PySide6
 python kdencut-docker/tests/test_mobile_viewport.py # requires Playwright + Chromium
+cmake -S kdencut-docker/tests/native -B /tmp/kdencut-mobile-checks # Qt6 Widgets + Test
+cmake --build /tmp/kdencut-mobile-checks
+QT_QPA_PLATFORM=offscreen ctest --test-dir /tmp/kdencut-mobile-checks --output-on-failure
 ```
 
 The browser checks cover container geometry and the Selkies message contract with
 a simulated stream; a rebuilt container and an iPhone are still needed for end-to-end
 validation of native docks, video streaming and touch input.
+
+The native checks compile the actual mobile workspace and exercise portrait,
+landscape, keyboard-height viewports, action enablement, panel ownership and
+scrollable dialog acceptance. GitHub Actions also builds the production Dockerfile,
+which runs the application's QML lint and C++ compilation before running these checks.

@@ -4,6 +4,7 @@
 */
 
 #include "touchmode.h"
+#include "mobileworkspace.h"
 #include "kdenlivesettings.h"
 
 #include <KColorSchemeManager>
@@ -14,6 +15,10 @@
 #include <QCursor>
 #include <QDebug>
 #include <QDir>
+#include <QDialog>
+#include <QScreen>
+#include <QTimer>
+#include <QWizard>
 #include <QEvent>
 #include <QFile>
 #include <QGraphicsView>
@@ -293,6 +298,14 @@ bool TouchMode::eventFilter(QObject *watched, QEvent *event)
     switch (event->type()) {
     case QEvent::Show:
         if (KdenliveSettings::touchmode() && watched->isWidgetType()) {
+            if (auto *dialog = qobject_cast<QDialog *>(watched); dialog && !qobject_cast<QWizard *>(dialog)) {
+                QTimer::singleShot(0, dialog, [dialog]() {
+                    const QRect available = dialog->screen()->availableGeometry();
+                    if (available.width() < 1100 || available.width() < available.height()) {
+                        MobileWorkspace::fitDialog(dialog, available);
+                    }
+                });
+            }
             if (auto *area = qobject_cast<QAbstractScrollArea *>(watched)) {
                 enableTouchScrolling(area);
             } else if (auto *bar = qobject_cast<QToolBar *>(watched)) {

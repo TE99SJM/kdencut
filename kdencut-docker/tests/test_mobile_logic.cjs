@@ -27,14 +27,16 @@ function client(width, height, {touch = true, hash = ''} = {}) {
 }
 const lastSize = c => c.messages.filter(m=>m.type === 'setManualResolution').at(-1);
 const checkSize = c => {
-  const size=lastSize(c);assert.ok(size.width>=960);assert.ok(size.height>=640);
+  const size=lastSize(c);assert.ok(size.width>=320);assert.ok(size.height>=280);
   assert.equal(size.width%2,0);assert.equal(size.height%2,0);
   assert.ok(Math.abs(size.width/size.height-c.viewport.width/(c.viewport.height-56))<.01);
   assert.equal(c.messages.at(-1).settings.scaling_dpi,96);
 };
-test('phone portrait and landscape retain the full logical workspace',()=>{
+test('phone portrait and landscape use phone-sized logical pixels',()=>{
   for(const [w,h] of [[320,568],[375,667],[430,932],[932,430],[1024,768]]){
-    const c=client(w,h);c.connect();checkSize(c);c.resize(h,w);checkSize(c);
+    const c=client(w,h);c.connect();checkSize(c);
+    if (w >= 320 && h - 56 >= 280) assert.equal(lastSize(c).width, Math.ceil(w/2)*2);
+    c.resize(h,w);checkSize(c);
   }
 });
 test('keyboard viewport shrinks and restores without cropping',()=>{

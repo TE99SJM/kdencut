@@ -1,0 +1,39 @@
+name: KdenCut container build
+
+on:
+  push:
+    branches: [kdencut-touch-capcut, kdencut-mobile-layout]
+    paths:
+      - 'src/**'
+      - 'kdencut-docker/**'
+      - 'CMakeLists.txt'
+      - '.qmllint.ini'
+      - '.github/workflows/kdencut-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kdencut-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build the production container, including QML lint
+        run: docker build --build-arg BUILD_JOBS=2 -f kdencut-docker/Dockerfile -t kdencut-ci .
+      - name: Check phone viewport messages
+        run: node --test kdencut-docker/tests/test_mobile_logic.cjs
+      - name: Compile and run the native phone layout checks
+        run: |
+          docker run --rm --entrypoint /bin/bash -v "$PWD:/src:ro" kdencut-ci -lc '
+            cmake -S /src/kdencut-docker/tests/native -B /tmp/mobile-checks &&
+            cmake --build /tmp/mobile-checks -j 2 &&
+            QT_QPA_PLATFORM=offscreen ctest --test-dir /tmp/mobile-checks --output-on-failure
+          '

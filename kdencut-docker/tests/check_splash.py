@@ -31,6 +31,7 @@ engine.loadData(source.encode(),QUrl('file:///tmp/Splash.qml'))
 assert engine.rootObjects(), 'QML failed to load'
 root=engine.rootObjects()[0]
 root.setProperty('actionsEnabled',True)
+root.setProperty('touchEnabled',False)
 for w,h in [(320,568),(375,667),(430,850),(932,430),(960,1700),(1280,720)]:
  root.setWidth(w);root.setHeight(h)
  for _ in range(10): app.processEvents()
@@ -56,3 +57,25 @@ root.firstStart.connect(lambda *args: selected.append(args))
 QMetaObject.invokeMethod(root.findChild(QQuickItem,'buttonNext'),'clicked')
 assert selected == [('1080x1920x709x1x1x9x16','60',False,3,1)], selected
 print('PASS project setup selections')
+
+# The phone home is the real QML component, including its project actions.
+root.setProperty('touchEnabled', True)
+root.setProperty('firstRun', False)
+root.setProperty('fileNames', ['A very long saved project name for a small phone.kdenlive'])
+root.setProperty('fileDates', ['10/11/26'])
+root.setProperty('urls', ['/media/very-long-project-name.kdenlive'])
+root.show()
+for w,h in [(320,568),(375,667),(430,850),(932,430)]:
+ root.setWidth(w);root.setHeight(h)
+ for _ in range(10): app.processEvents()
+ for name in ['mobileNewVideo','mobileOrientation','mobileOpenProject']:
+  item=root.findChild(QQuickItem,name)
+  pos=item.mapToScene(QPointF(0,0))
+  assert item.isVisible(),name
+  assert pos.x()>=0 and pos.x()+item.width()<=w+.1,(w,h,name,pos,item.width())
+ print('PASS phone home controls fit',w,h)
+root.findChild(QQuickItem,'mobileOrientation').setProperty('currentIndex',1)
+root.setProperty('mobileBusy',False)
+QMetaObject.invokeMethod(root.findChild(QQuickItem,'mobileNewVideo'),'clicked')
+assert selected[-1] == ('1920x1080x709x1x1x16x9','30',False,2,2),selected
+print('PASS phone New video uses selected orientation')

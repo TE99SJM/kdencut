@@ -533,11 +533,13 @@ function getTrackColor(audio, header) {
     readonly property int activeTool: K.Core.activeTool
     readonly property int minClipWidthForViews: 1.5 * K.UiUtils.baseSizeMedium
     readonly property int collapsedHeight: Math.max(28, K.UiUtils.baseSizeMedium * 1.8)
-    readonly property int minHeaderWidth: 6 * collapsedHeight
+    readonly property bool mobileLayout: K.KdenliveSettings.touchmode && (Screen.width < 1100 || Screen.width < Screen.height)
+    readonly property int minHeaderWidth: mobileLayout ? 72 : 6 * collapsedHeight
     readonly property bool autoTrackHeight: root.timeline.autotrackHeight
     readonly property color selectedTrackColor: Qt.rgba(activePalette.highlight.r, activePalette.highlight.g, activePalette.highlight.b, 0.2)
     readonly property color frameColor: Qt.rgba(activePalette.shadow.r, activePalette.shadow.g, activePalette.shadow.b, 0.5)
-    property int headerWidth: Math.max(minHeaderWidth, root.timeline.headerWidth())
+    property int desktopHeaderWidth: root.timeline.headerWidth()
+    readonly property int headerWidth: mobileLayout ? 72 : Math.max(minHeaderWidth, desktopHeaderWidth)
     property bool blockAutoScroll: false
     property int duration: root.timeline.duration
     property color audioColor: root.timeline.audioColor
@@ -1281,6 +1283,7 @@ function getTrackColor(audio, header) {
                         }
                         TrackHead {
                             required property var model
+                            mobileLayout: root.mobileLayout
                             trackName: model.name
                             thumbsFormat: model.thumbsFormat
                             trackTag: model.trackTag
@@ -1335,6 +1338,7 @@ function getTrackColor(audio, header) {
                 }
                 Column {
                     id: trackHeadersResizer
+                    visible: !root.mobileLayout
                     spacing: 0
                     width: Math.round(K.UiUtils.baseSizeMedium / 3)
                     Rectangle {
@@ -1372,7 +1376,7 @@ function getTrackColor(audio, header) {
                             onPositionChanged: mouse => {
                                 if (mouse.buttons === Qt.LeftButton) {
                                     parent.opacity = 0.5
-                                    root.headerWidth = Math.max( root.minHeaderWidth, mapToItem(null, x, y).x + 2)
+                                    root.desktopHeaderWidth = Math.max( root.minHeaderWidth, mapToItem(null, x, y).x + 2)
                                     root.timeline.setHeaderWidth(root.headerWidth)
                                 }
                             }

@@ -82,6 +82,7 @@ list(APPEND kdenlive_SRCS
     filefilter.cpp
     powermanagementinterface.cpp
     kdencut/touchmode.cpp
+    kdencut/mobileworkspace.cpp
 )
 
 if(CRASH_AUTO_TEST)

@@ -49,6 +49,7 @@ Splash::Splash(const QString version, const QStringList urls, const QStringList 
     if (showWelcome) {
         bool isPalFps = ProjectManager::getDefaultProjectFormat().endsWith(QLatin1String("_25"));
         m_engine->setInitialProperties({{"version", version},
+                                        {"touchEnabled", KdenliveSettings::touchmode()},
                                         {"fileNames", fileNames},
                                         {"fileDates", fileDates},
                                         {"urls", urls},

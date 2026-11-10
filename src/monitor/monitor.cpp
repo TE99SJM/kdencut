@@ -1914,6 +1914,25 @@ void Monitor::slotRefreshMonitor(bool visible)
     }
 }
 
+void Monitor::setMobileLayout(bool mobile)
+{
+    if (mobile) {
+        m_desktopMinimumSize = minimumSize();
+        m_desktopVideoMinimumSize = m_glWidget->minimumSize();
+        m_glMonitor->setFixedImageSize(QSize());
+        m_glWidget->setMinimumSize(160, 90);
+        setMinimumSize(0, 90);
+        m_toolbar->hide();
+        m_glMonitor->switchRuler(false);
+    } else {
+        setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+        setMinimumSize(m_desktopMinimumSize);
+        m_glWidget->setMinimumSize(m_desktopVideoMinimumSize);
+        m_toolbar->show();
+        m_glMonitor->switchRuler(KdenliveSettings::displayProjectMonitorInfo() & Monitor::InfoOverlay);
+    }
+}
+
 void Monitor::forceMonitorRefresh()
 {
     if (!slotTemporaryActivateMonitor()) {

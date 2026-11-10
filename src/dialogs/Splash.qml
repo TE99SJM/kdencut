@@ -27,6 +27,10 @@ Window {
     property var horizontalFpsModel: [{value: "24000/1001", text: KI18n.i18n("23.98 fps")},
         {value: "24", text: KI18n.i18n("24 fps")}, {value: "25", text: KI18n.i18n("25 fps")}, {value: "30000/1001", text: KI18n.i18n("29.97 fps")}, {value: "30", text: KI18n.i18n("30 fps")}, {value: "50", text: KI18n.i18n("50 fps")}, {value: "60000/1001", text: KI18n.i18n("59.94 fps")}, {value: "60", text: KI18n.i18n("60 fps")}]
     property var verticalFpsModel: [{value: "25", text: KI18n.i18n("25 fps")}, {value: "30", text: KI18n.i18n("30 fps")}, {value: "60", text: KI18n.i18n("60 fps")}]
+    property bool touchEnabled: true
+    readonly property bool phoneLayout: touchEnabled && (Screen.width < 1100 || Screen.width < Screen.height)
+    property bool mobileBusy: false
+    property string mobileProgress: ""
     property bool firstRun: true
     property bool crashRecovery: false
     property bool actionsEnabled: false
@@ -62,13 +66,13 @@ Window {
     // The welcome screen must also fit a resized remote desktop / phone.
     minimumWidth: Math.min(320, Screen.width)
     minimumHeight: Math.min(240, Screen.height)
-    width: Math.min(splashContent.implicitWidth, Screen.width - 16)
-    height: Math.min(splashContent.implicitHeight, Screen.height - 16)
+    width: phoneLayout ? Screen.width : Math.min(splashContent.implicitWidth, Screen.width - 16)
+    height: phoneLayout ? Screen.height : Math.min(splashContent.implicitHeight, Screen.height - 16)
     readonly property bool narrow: width < splash.sizeUnit * 17
 
     function fitScreen() {
-        width = Math.min(splashContent.implicitWidth, Screen.width - 16)
-        height = Math.min(splashContent.implicitHeight, Screen.height - 16)
+        width = phoneLayout ? Screen.width : Math.min(splashContent.implicitWidth, Screen.width - 16)
+        height = phoneLayout ? Screen.height : Math.min(splashContent.implicitHeight, Screen.height - 16)
         x = Math.max(0, Math.round((Screen.width - width) / 2))
         y = Math.max(0, Math.round((Screen.height - height) / 2))
     }
@@ -95,6 +99,8 @@ Window {
 
     function displayProgress(message)
     {
+        mobileProgress = message
+        mobileBusy = message.length > 0
         loadingLabel.text = message
         loadingBox.visible = message.length > 0
         recentProjects.enabled = false
@@ -118,8 +124,195 @@ Window {
         id: activePalette
     }
 
+    Control {
+        id: mobileHome
+        anchors.fill: parent
+        palette.window: "#121212"
+        palette.windowText: "#eeeeee"
+        palette.button: "#242424"
+        palette.buttonText: "#eeeeee"
+        palette.base: "#202020"
+        palette.text: "#eeeeee"
+        palette.highlight: "#08bfd0"
+        background: Rectangle { color: "#121212" }
+        visible: splash.phoneLayout && !splash.crashRecovery && !splash.wasUpgraded
+        opacity: splashContent.opacity
+        ScrollView {
+            id: mobileHomeScroll
+            anchors.fill: parent
+            contentWidth: availableWidth
+            clip: true
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            ColumnLayout {
+                width: mobileHomeScroll.availableWidth
+                spacing: 18
+                Item { Layout.preferredHeight: 20 }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                    Label {
+                        text: "KdenCut"
+                        font.pixelSize: 30
+                        font.bold: true
+                        color: "#ffffff"
+                        Layout.fillWidth: true
+                    }
+                    ToolButton {
+                        text: "×"
+                        font.pixelSize: 28
+                        implicitWidth: 48
+                        implicitHeight: 48
+                        Accessible.name: KI18n.i18n("Close")
+                        onClicked: splash.close()
+                    }
+                }
+                Label {
+                    text: KI18n.i18n("Your next video starts here.")
+                    font.pixelSize: 16
+                    color: "#b9b9b9"
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                }
+                Button {
+                    id: mobileNewVideo
+                    objectName: "mobileNewVideo"
+                    text: KI18n.i18n("New video")
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                    Layout.preferredHeight: 136
+                    enabled: splash.actionsEnabled && !splash.mobileBusy
+                    contentItem: Column {
+                        spacing: 6
+                        Label {
+                            width: parent.width
+                            text: "+"
+                            font.pixelSize: 40
+                            horizontalAlignment: Text.AlignHCenter
+                            color: "#071719"
+                        }
+                        Label {
+                            width: parent.width
+                            text: mobileNewVideo.text
+                            font.pixelSize: 23
+                            font.bold: true
+                            horizontalAlignment: Text.AlignHCenter
+                            color: "#071719"
+                        }
+                    }
+                    background: Rectangle {
+                        radius: 18
+                        color: mobileNewVideo.down ? "#08a6b5" : "#08bfd0"
+                        opacity: mobileNewVideo.enabled ? 1 : 0.55
+                    }
+                    onClicked: {
+                        splash.mobileBusy = true
+                        splash.firstStart(mobileOrientation.currentIndex === 0 ? "1080x1920x709x1x1x9x16" : "1920x1080x709x1x1x16x9", "30", false, 2, 2)
+                    }
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                    Label { text: KI18n.i18n("Format"); color: "#b9b9b9" }
+                    ComboBox {
+                        id: mobileOrientation
+                        font.pixelSize: 14
+                        objectName: "mobileOrientation"
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        implicitHeight: 48
+                        model: [KI18n.i18n("Portrait · 9:16"), KI18n.i18n("Landscape · 16:9")]
+                    }
+                }
+                Button {
+                    id: mobileOpenProject
+                    font.pixelSize: 16
+                    objectName: "mobileOpenProject"
+                    text: KI18n.i18n("Open project")
+                    icon.name: "document-open"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                    implicitHeight: 52
+                    enabled: splash.actionsEnabled && !splash.mobileBusy
+                    onClicked: splash.openOtherFile()
+                }
+                Label {
+                    text: KI18n.i18n("Recent projects")
+                    font.pixelSize: 20
+                    font.bold: true
+                    color: "#ffffff"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                }
+                Repeater {
+                    model: splash.urls.length
+                    delegate: Button {
+                        id: recentMobileProject
+                        required property int index
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 20
+                        Layout.rightMargin: 20
+                        implicitHeight: 76
+                        enabled: splash.actionsEnabled && !splash.mobileBusy
+                        background: Rectangle {
+                            radius: 12
+                            color: recentMobileProject.down ? "#28474a" : "#242424"
+                        }
+                        Accessible.name: splash.fileNames[index] || ""
+                        contentItem: Column {
+                            spacing: 6
+                            Label {
+                                width: parent.width
+                                text: splash.fileNames[recentMobileProject.index] || ""
+                                font.pixelSize: 16
+                                color: "#eeeeee"
+                                elide: Text.ElideMiddle
+                            }
+                            Label {
+                                width: parent.width
+                                text: splash.fileDates[recentMobileProject.index] || ""
+                                color: "#a2a2a2"
+                                elide: Text.ElideRight
+                            }
+                        }
+                        onClicked: {
+                            splash.mobileBusy = true
+                            splash.openFile(splash.urls[index])
+                        }
+                    }
+                }
+                Label {
+                    visible: splash.urls.length === 0
+                    text: KI18n.i18n("Your saved projects will appear here.")
+                    wrapMode: Text.WordWrap
+                    color: "#a2a2a2"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                }
+                Label {
+                    visible: splash.mobileProgress.length > 0
+                    text: splash.mobileProgress
+                    wrapMode: Text.WordWrap
+                    color: "#08bfd0"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                }
+                Item { Layout.preferredHeight: 24 }
+            }
+        }
+    }
+
     Rectangle {
         id: splashContent
+        visible: !mobileHome.visible
         anchors.fill: parent
         implicitHeight: splash.crashRecovery || splash.wasUpgraded ? splash.sizeUnit * 20 : splash.sizeUnit * 18
         implicitWidth: splash.sizeUnit * 17
