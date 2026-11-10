@@ -39,6 +39,10 @@ private Q_SLOTS:
         KDDockWidgets::LayoutSaver saver(KDDockWidgets::RestoreOption_RelativeToMainWindow);
         const QByteArray saved = saver.serializeLayout();
         desktop.hide();
+        QWidget owner;
+        static_cast<QWidget *>(&desktop)->setParent(&owner);
+        QCOMPARE(desktop.parentWidget(), &owner);
+        static_cast<QWidget *>(&desktop)->setParent(nullptr);
         dock->close();
         auto *placeholder = new QWidget;
         dock->setWidget(placeholder);

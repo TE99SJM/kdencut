@@ -4532,7 +4532,7 @@ void MainWindow::updateTouchLayout()
     // Remove the entire desktop workspace from the window's size calculation.
     // A hidden stack page would still contribute all the dock minimum widths.
     takeCentralWidget()->hide();
-    mainDockWindow->setParent(this);
+    static_cast<QWidget *>(mainDockWindow)->setParent(this);
     for (QWidget *widget : QApplication::allWidgets()) {
         if (auto *dock = qobject_cast<KDDockWidgets::QtWidgets::DockWidget *>(widget)) {
             dock->close();
