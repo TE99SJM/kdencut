@@ -11,6 +11,7 @@
 #include <QFileInfo>
 
 #include <KColorSchemeManager>
+#include "kdencut/touchmode.h"
 #include <KColorSchemeModel>
 #include <KLocalizedQmlContext>
 #include <KLocalizedString>
@@ -149,7 +150,7 @@ void Splash::setReady()
 
 void Splash::switchPalette(bool dark)
 {
-    KColorSchemeManager::instance()->activateSchemeId(dark ? QStringLiteral("BreezeDark") : QString());
+    KColorSchemeManager::instance()->activateSchemeId(dark ? KdenCut::TouchMode::colorSchemeId() : QString());
 }
 
 void Splash::showProgressMessage(const QString &message, int)

@@ -393,6 +393,7 @@ Monitor::Monitor(Kdenlive::MonitorId id, MonitorManager *manager, QWidget *paren
     connect(rewind, &QAction::triggered, this, [&]() { Monitor::slotRewind(); });
 
     auto *playButton = new QToolButton(m_toolbar);
+    playButton->setObjectName(QStringLiteral("kdencutPlayButton"));
     m_playMenu = new QMenu(i18n("Play"), this);
     connect(m_playMenu, &QMenu::aboutToShow, this, &Monitor::slotActivateMonitor);
     QAction *originalPlayAction = static_cast<KDualAction *>(manager->getAction(QStringLiteral("monitor_play")));

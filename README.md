@@ -1,6 +1,10 @@
 ![](data/pics/kdenlive-logo.png)
 
-# Kdenlive
+# KdenCut
+
+**KdenCut** is a touch-friendly, CapCut-style fork of Kdenlive. The mouse cursor is hidden by default, controls are sized for fingers and the timeline supports pinch-to-zoom. See [KDENCUT.md](KDENCUT.md) for details.
+
+## About Kdenlive
 
 Kdenlive is a powerful, free and open-source video editor that brings professional-grade video editing capabilities to everyone. Whether you're creating a simple family video or working on a complex project, Kdenlive provides the tools you need to bring your vision to life.
 

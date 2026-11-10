@@ -4,6 +4,7 @@
 */
 
 #include "uiutils.h"
+#include "kdencut/touchmode.h"
 #include "kdenlivesettings.h"
 
 #include <QFileDialog>
@@ -75,7 +76,8 @@ QFont UiUtils::getSmallestReadableFont()
 qreal UiUtils::getBaseSizeMedium()
 {
     QFontInfo fi(getFixedFont());
-    return fi.pixelSize();
+    // KdenCut: bigger timeline handles and buttons for fingers in touch mode
+    return qRound(fi.pixelSize() * KdenCut::TouchMode::sizeMultiplier());
 }
 
 QStringList UiUtils::checkUnknownProxyParams(QString proxyData)

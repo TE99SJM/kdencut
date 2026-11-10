@@ -471,6 +471,24 @@ Window {
                         bottomPadding: 16
                         palette.buttonText: "#ffffff"
                         icon.color: "#ffffff"
+                        // qqc2-desktop-style paints the label inside its background,
+                        // so a custom background needs an explicit content item
+                        contentItem: RowLayout {
+                            spacing: 12
+                            Item { Layout.fillWidth: true }
+                            Label {
+                                text: "+"
+                                font.pixelSize: Math.round(newProjectButton.font.pixelSize * 1.5)
+                                font.bold: true
+                                color: "#ffffff"
+                            }
+                            Label {
+                                text: newProjectButton.text
+                                font: newProjectButton.font
+                                color: "#ffffff"
+                            }
+                            Item { Layout.fillWidth: true }
+                        }
                         background: Rectangle {
                             radius: 16
                             color: !newProjectButton.enabled ? "#52666a"

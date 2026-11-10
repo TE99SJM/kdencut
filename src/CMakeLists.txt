@@ -81,6 +81,7 @@ list(APPEND kdenlive_SRCS
     glaxnimatelauncher.cpp
     filefilter.cpp
     powermanagementinterface.cpp
+    kdencut/touchmode.cpp
 )
 
 if(CRASH_AUTO_TEST)
@@ -133,6 +134,7 @@ kconfig_target_kcfg_file(kdenliveLib
     DEFAULT_VALUE_GETTERS
 )
 install(FILES kdenlivesettings.kcfg DESTINATION ${KDE_INSTALL_KCFGDIR})
+install(FILES kdencut/KdenCut.colors DESTINATION ${KDE_INSTALL_DATADIR}/color-schemes)
 
 ecm_add_qml_module(kdenliveLib
     URI org.kde.kdenlive

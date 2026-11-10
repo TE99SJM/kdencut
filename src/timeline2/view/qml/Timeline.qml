@@ -337,6 +337,17 @@ Rectangle {
         return Math.max(0, scrollView.contentX + posInWidget.x - trackHeaders.width)
     }
 
+    // KdenCut touch helpers
+    property real pinchTargetX: 0
+    function clampContentX(value) {
+        var maxX = Math.max(0, root.timeline.fullDuration * root.timeScale - scrollView.width)
+        return Math.max(0, Math.min(value, maxX))
+    }
+    function clampContentY(value) {
+        var maxY = Math.max(0, scrollView.contentHeight - scrollView.height)
+        return Math.max(0, Math.min(value, maxY))
+    }
+
     function getMouseX() {
         var posInWidget = root.timeline.getMousePosInTimeline()
         return Math.max(0, posInWidget.x - trackHeaders.width)
@@ -610,6 +621,10 @@ function getTrackColor(audio, header) {
     onTimeScaleChanged: {
         if (root.timeline.fullDuration * root.timeScale < scrollView.width) {
             scrollView.contentX = 0
+            root.zoomOnMouse = -1
+        } else if (touchPinch.active) {
+            // KdenCut: keep the frame under the fingers in place while pinching
+            scrollView.contentX = root.clampContentX(root.pinchTargetX)
             root.zoomOnMouse = -1
         } else if (K.KdenliveSettings.centeredplayhead) {
             scrollView.contentX = Math.max(0, root.consumerPosition * root.timeScale - (scrollView.width / 2))
@@ -1397,6 +1412,47 @@ function getTrackColor(audio, header) {
                 default:
                     return Qt.SizeHorCursor;
                 }
+            }
+            // KdenCut: two fingers pinch to zoom and drag to scroll the timeline
+            PinchHandler {
+                id: touchPinch
+                target: null
+                enabled: K.KdenliveSettings.touchmode
+                minimumPointCount: 2
+                maximumPointCount: 2
+                acceptedDevices: PointerDevice.TouchScreen | PointerDevice.TouchPad
+                grabPermissions: PointerHandler.CanTakeOverFromAnything
+                property real startScale: 1
+                property real startContentY: 0
+                property real anchorX: 0
+                property real anchorFrame: 0
+                function applyPinch() {
+                    if (!active) {
+                        return
+                    }
+                    var minScale = root.fitZoom() / 4
+                    var newScale = Math.max(minScale, Math.min(startScale * activeScale, 40))
+                    var desiredX = anchorFrame * newScale - anchorX - activeTranslation.x
+                    scrollView.contentY = root.clampContentY(startContentY - activeTranslation.y)
+                    if (Math.abs(newScale - root.timeScale) > 0.0001) {
+                        root.pinchTargetX = desiredX
+                        root.timeline.scaleFactor = newScale
+                    } else {
+                        scrollView.contentX = root.clampContentX(desiredX)
+                    }
+                }
+                onActiveChanged: {
+                    if (active) {
+                        startScale = root.timeScale
+                        startContentY = scrollView.contentY
+                        var p = scrollView.mapFromItem(tracksArea, centroid.position.x, centroid.position.y)
+                        anchorX = Math.max(0, p.x)
+                        anchorFrame = (scrollView.contentX + anchorX) / Math.max(0.0001, startScale)
+                        rubberSelect.visible = false
+                    }
+                }
+                onScaleChanged: applyPinch()
+                onTranslationChanged: applyPinch()
             }
             onWheel: wheel => {
                 if (wheel.modifiers & Qt.AltModifier || wheel.modifiers & Qt.ControlModifier || mouseY > trackHeaders.height) {

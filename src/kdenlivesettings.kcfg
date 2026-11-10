@@ -1466,6 +1466,18 @@
     </entry>
     </group>
   <group name="startup">
+    <entry name="touchmode" type="Bool">
+      <label>KdenCut touch mode: larger controls, swipe scrolling and pinch-to-zoom.</label>
+      <default>true</default>
+    </entry>
+    <entry name="showcursor" type="Bool">
+      <label>KdenCut: show the mouse cursor (hidden by default for touch screens).</label>
+      <default>false</default>
+    </entry>
+    <entry name="kdencutthemeversion" type="Int">
+      <label>Version of the KdenCut look that was last applied.</label>
+      <default>0</default>
+    </entry>
     <entry name="force_breeze" type="Bool">
       <label>Force breeze icon theme for consistent look.</label>
       <default>false</default>

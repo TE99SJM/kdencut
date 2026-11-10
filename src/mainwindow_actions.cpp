@@ -7,6 +7,7 @@
 #include "assets/assetpanel.hpp"
 #include "core.h"
 #include "kdenlivesettings.h"
+#include "kdencut/touchmode.h"
 #include "mainwindow.h"
 #include "monitor/monitor.h"
 #include "monitor/monitormanager.h"
@@ -118,6 +119,18 @@ void MainWindow::setupActions()
         Q_EMIT pCore->hideBars(!checked);
     });
     connect(pCore.get(), &Core::switchTitleBars, this, [switchAction]() { switchAction->trigger(); });
+
+    // KdenCut touch options
+    QAction *touchModeAction = addAction(QStringLiteral("kdencut_touch_mode"), i18n("Touch Mode"), QIcon::fromTheme(QStringLiteral("input-touchscreen")));
+    touchModeAction->setCheckable(true);
+    touchModeAction->setChecked(KdenCut::TouchMode::instance()->touchEnabled());
+    touchModeAction->setToolTip(i18n("Large controls, swipe scrolling and pinch-to-zoom. Timeline sizes update after a restart."));
+    connect(touchModeAction, &QAction::toggled, KdenCut::TouchMode::instance(), &KdenCut::TouchMode::setTouchEnabled);
+
+    QAction *showCursorAction = addAction(QStringLiteral("kdencut_show_cursor"), i18n("Show Mouse Cursor"), QIcon::fromTheme(QStringLiteral("input-mouse")));
+    showCursorAction->setCheckable(true);
+    showCursorAction->setChecked(KdenCut::TouchMode::instance()->cursorVisible());
+    connect(showCursorAction, &QAction::toggled, KdenCut::TouchMode::instance(), &KdenCut::TouchMode::setCursorVisible);
 
     QAction *showMixer = addAction(QStringLiteral("audiomixer_button"), i18n("Audio Mixer"), QIcon::fromTheme(QStringLiteral("view-media-equalizer")));
     showMixer->setCheckable(true);
