@@ -28,7 +28,7 @@ Window {
         {value: "24", text: KI18n.i18n("24 fps")}, {value: "25", text: KI18n.i18n("25 fps")}, {value: "30000/1001", text: KI18n.i18n("29.97 fps")}, {value: "30", text: KI18n.i18n("30 fps")}, {value: "50", text: KI18n.i18n("50 fps")}, {value: "60000/1001", text: KI18n.i18n("59.94 fps")}, {value: "60", text: KI18n.i18n("60 fps")}]
     property var verticalFpsModel: [{value: "25", text: KI18n.i18n("25 fps")}, {value: "30", text: KI18n.i18n("30 fps")}, {value: "60", text: KI18n.i18n("60 fps")}]
     property bool touchEnabled: true
-    readonly property bool phoneLayout: touchEnabled && (Screen.width < 1100 || Screen.width < Screen.height)
+    readonly property bool phoneLayout: touchEnabled
     property bool mobileBusy: false
     property string mobileProgress: ""
     property bool firstRun: true
@@ -144,7 +144,8 @@ Window {
             clip: true
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
             ColumnLayout {
-                width: mobileHomeScroll.availableWidth
+                width: Math.min(640, mobileHomeScroll.availableWidth)
+                x: (mobileHomeScroll.availableWidth - width) / 2
                 spacing: 18
                 Item { Layout.preferredHeight: 20 }
                 RowLayout {

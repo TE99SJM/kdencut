@@ -139,6 +139,9 @@ void TouchMode::applyLookIfNeeded()
         return;
     }
     KColorSchemeManager::instance()->activateSchemeId(colorSchemeId());
+    // The reskin becomes the initial workspace for existing KdenCut profiles.
+    // A later explicit choice of Desktop controls remains saved as usual.
+    setTouchEnabled(true);
     if (KdenliveSettings::trackheight() < touchTrackHeight) {
         KdenliveSettings::setTrackheight(touchTrackHeight);
     }

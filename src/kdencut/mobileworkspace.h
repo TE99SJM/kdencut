@@ -27,6 +27,7 @@ public:
     void showPanel(QWidget *panel, const QString &title, bool media = false);
     QWidget *takePanel();
     void showEditor();
+    void showEditTools();
     void setPlaying(bool playing);
     void setTimecode(const QString &timecode);
     QSize sizeHint() const override;
@@ -48,12 +49,14 @@ private:
     QWidget *m_editor;
     QSplitter *m_splitter;
     QStackedWidget *m_lower;
+    QStackedWidget *m_tools;
+    QWidget *m_mainTools;
+    QWidget *m_editTools;
     QWidget *m_timeline;
     QWidget *m_panelPage;
     QScrollArea *m_panelScroll;
     QLabel *m_panelTitle;
     QWidget *m_mediaTools;
-    QLabel *m_timecode;
     QToolButton *m_play;
     bool m_landscape{false};
 };

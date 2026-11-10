@@ -93,6 +93,8 @@ class MobileViewportTest(unittest.TestCase):
         page.wait_for_timeout(250)
         self.assertFalse(page.evaluate("sent.some(x=>x.type==='setManualResolution')"))
 
+
+class MobileInstallerTest(unittest.TestCase):
     def test_installer_idempotent(self):
         spec = importlib.util.spec_from_file_location('installer', ASSETS / 'install-web-ui.py')
         module = importlib.util.module_from_spec(spec)
@@ -109,6 +111,19 @@ class MobileViewportTest(unittest.TestCase):
             self.assertEqual(page.read_text(), first)
             self.assertEqual(first.count('kdencut-mobile.js'),1)
             self.assertEqual(first.count('viewport-fit=cover'),1)
+            self.assertIn('kdencut-mobile.js?v=',first)
+            self.assertIn('kdencut-mobile.css?v=',first)
+            changed = root / 'assets'
+            changed.mkdir()
+            for suffix in ('js', 'css'):
+                shutil.copyfile(ASSETS / f'mobile.{suffix}', changed / f'mobile.{suffix}')
+            with (changed / 'mobile.js').open('a') as script:
+                script.write('\n// new version\n')
+            module.install(root,changed)
+            self.assertNotEqual(page.read_text(), first)
+            self.assertEqual(page.read_text().count('kdencut-mobile.js'),1)
+            module.install(root,ASSETS)
+            self.assertEqual(page.read_text(), first)
             self.assertEqual((dashboard / 'kdencut-mobile.js').read_bytes(), (ASSETS / 'mobile.js').read_bytes())
 
 

@@ -274,7 +274,7 @@ private:
     void showTouchPanel(KDDockWidgets::QtWidgets::DockWidget *dock);
     void closeTouchPanel();
     void touchCommand(const QString &name);
-    void importTouchMedia(bool audio, bool title = false);
+    void importTouchMedia(bool audio, bool title = false, bool overlay = false);
     QByteArray m_touchWideLayout;
     bool m_touchCompactLayout{false};
     bool m_touchMovingWidgets{false};

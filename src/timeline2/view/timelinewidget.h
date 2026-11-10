@@ -116,6 +116,7 @@ private:
     QUuid m_uuid;
 
 Q_SIGNALS:
+    void touchCommand(const QString &name);
     void focusProjectMonitor();
     void zoneMoved(const QPoint &zone);
     void zoomIn(bool zoomOnMouse);

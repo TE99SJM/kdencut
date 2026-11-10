@@ -124,7 +124,7 @@ void MainWindow::setupActions()
     QAction *touchModeAction = addAction(QStringLiteral("kdencut_touch_mode"), i18n("Touch Mode"), QIcon::fromTheme(QStringLiteral("input-touchscreen")));
     touchModeAction->setCheckable(true);
     touchModeAction->setChecked(KdenCut::TouchMode::instance()->touchEnabled());
-    touchModeAction->setToolTip(i18n("Large controls, swipe scrolling and pinch-to-zoom. Timeline sizes update after a restart."));
+    touchModeAction->setToolTip(i18n("Simple touch editor with a large preview, swipeable tools and a scrolling thumbnail timeline."));
     connect(touchModeAction, &QAction::toggled, KdenCut::TouchMode::instance(), &KdenCut::TouchMode::setTouchEnabled);
 
     QAction *showCursorAction = addAction(QStringLiteral("kdencut_show_cursor"), i18n("Show Mouse Cursor"), QIcon::fromTheme(QStringLiteral("input-mouse")));

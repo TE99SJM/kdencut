@@ -37,7 +37,7 @@ cd ~/kdencut/kdencut-docker && docker compose down
 - The mouse cursor is hidden on purpose. Right-click the desktop (outside KdenCut) and choose
   **KdenCut (show cursor)**, or use **View > Show Mouse Cursor**.
 - Through the browser, taps act as clicks. Two-finger pinch-zoom on the timeline needs a
-  touchscreen attached directly to a Linux PC; in the browser use the timeline zoom slider.
+  touchscreen attached directly to a Linux PC; in the browser use Edit > Zoom in / Zoom out.
 - The web desktop includes a terminal with root access. Keep it on your home network or
   Tailscale, and always set `CUSTOM_USER` and `PASSWORD`.
 
@@ -50,15 +50,21 @@ The streamed desktop now uses phone-sized logical pixels at 96 DPI (minimum
 Selkies scales the stream and pointer coordinates together. Administrator-pinned
 resolution/DPI settings are respected.
 
-With Touch Mode enabled, screens narrower than 1100 pixels or in portrait use a
-full-screen mobile workspace. The project preview sits above the timeline in
-portrait; landscape places them side by side. A swipeable bottom strip opens Media,
-Audio, Text, Effects, Adjust, Captions and Transitions. Save and Export stay at the
-top, with playback and undo/redo below the preview. Timeline commands include Add,
-Split, Delete, Duplicate and Fit. Importing media inserts it into the active
+Touch Mode uses the full-screen editing workspace at every screen size. The project preview sits above the timeline in
+portrait; landscape places them side by side. The swipeable bottom strip contains
+Edit, Audio, Text, Effects, Overlay, Captions, Filters, Adjust and Transitions.
+Media, Save and Export stay at the top, with playback and undo/redo below the preview.
+Edit opens Split, Delete, Duplicate, Fit and zoom controls. Importing media inserts it into the active
 matching track; the Media sheet can also insert selected bin clips.
-Audio and Text imports use an empty matching track, creating one when needed,
+Audio, Text and Overlay imports use an empty matching track, creating one when needed,
 so added music and titles do not collide with existing clips.
+
+The touch timeline keeps a white playhead centered while thumbnail strips scroll
+under it. Swipe to scrub with momentum; tap a clip to select it. Hold a clip before
+dragging to move it, or drag its large white edge handles to trim. Each completed
+move or trim uses the existing undoable timeline operation. Empty tracks are hidden;
+Add video, Add audio and Add text remain directly accessible. Track scrolling and
+tool strips accept mouse drags from the browser as well as direct touch.
 
 The mobile home has New video, portrait/landscape format selection, Open project,
 and recent projects. Home inside the editor offers Continue editing and Desktop
@@ -66,13 +72,14 @@ controls. Secondary dock panels open as scrollable sheets. Oversized desktop
 forms, including export settings, scroll within the available screen. Advanced
 forms still use their existing Kdenlive controls.
 
-A wide landscape screen or disabling Touch Mode restores the previous desktop
-layout. Project saves retain that desktop layout; loading projects and changing
+Home > Desktop controls restores the previous desktop layout. Upgrading to this
+reskin enables Touch Mode once for existing profiles; a later Desktop choice is
+remembered. Project saves retain that desktop layout; loading projects and changing
 project aspect ratio cannot restore desktop docks over the phone workspace.
 Quick Setup and recovery screens remain available.
 
 Rebuild the image after pulling this change and reload the browser page to load the
-new viewport adapter. No configuration reset is needed. This does not install the
+new viewport adapter. Asset URLs are versioned so the browser fetches changed files. No configuration reset is needed. This does not install the
 optional Glaxnimate/Lottie module shown in the startup warning.
 
 Developer checks:
@@ -81,9 +88,9 @@ Developer checks:
 node --test kdencut-docker/tests/test_mobile_logic.cjs
 python kdencut-docker/tests/check_splash.py        # requires PySide6
 python kdencut-docker/tests/test_mobile_viewport.py # requires Playwright + Chromium
-cmake -S kdencut-docker/tests/native -B /tmp/kdencut-mobile-checks # Qt6 Widgets + Test
+cmake -S kdencut-docker/tests/native -B /tmp/kdencut-mobile-checks # Qt6 Widgets + QuickWidgets + Test
 cmake --build /tmp/kdencut-mobile-checks
-QT_QPA_PLATFORM=offscreen ctest --test-dir /tmp/kdencut-mobile-checks --output-on-failure
+QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software ctest --test-dir /tmp/kdencut-mobile-checks --output-on-failure
 ```
 
 The browser checks cover container geometry and the Selkies message contract with
@@ -92,5 +99,6 @@ validation of native docks, video streaming and touch input.
 
 The native checks compile the actual mobile workspace and exercise portrait,
 landscape, keyboard-height viewports, action enablement, panel ownership and
-scrollable dialog acceptance. GitHub Actions also builds the production Dockerfile,
+scrollable dialog acceptance. They also load the real touch QML with hierarchical
+clip data and check swipe-to-scrub, hold-to-move and trim-on-release. GitHub Actions also builds the production Dockerfile,
 which runs the application's QML lint and C++ compilation before running these checks.

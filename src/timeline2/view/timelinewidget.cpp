@@ -296,6 +296,7 @@ void TimelineWidget::setModel(const std::shared_ptr<TimelineItemModel> &model, M
     loadFromModule(QStringLiteral("org.kde.kdenlive"), QStringLiteral("Timeline"));
 
     connect(rootObject(), SIGNAL(zoomIn(bool)), this, SIGNAL(zoomIn(bool)));
+    connect(rootObject(), SIGNAL(touchCommand(QString)), this, SIGNAL(touchCommand(QString)));
     connect(rootObject(), SIGNAL(zoomOut(bool)), this, SIGNAL(zoomOut(bool)));
     connect(rootObject(), SIGNAL(processingDrag(bool)), this, SIGNAL(processingDrag(bool)));
     connect(&timelineController, &TimelineController::seeked, proxy, &MonitorProxy::setPosition);

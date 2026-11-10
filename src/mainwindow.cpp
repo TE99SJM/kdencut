@@ -121,6 +121,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include <QPushButton>
 #include <QScreen>
 #include <QTimer>
+#include <QTabBar>
 #include <QWindow>
 #include <QStandardPaths>
 #include <QStatusBar>
@@ -4240,6 +4241,7 @@ bool MainWindow::raiseTimeline(const QUuid &uuid)
 
 void MainWindow::connectTimelineApplication(TimelineWidget *timeline)
 {
+    connect(timeline, &TimelineWidget::touchCommand, this, &MainWindow::touchCommand);
     connect(timeline, &TimelineWidget::zoomIn, this, &MainWindow::slotZoomIn);
     connect(timeline, &TimelineWidget::zoomOut, this, &MainWindow::slotZoomOut);
     connect(timeline, &TimelineWidget::processingDrag, this, &MainWindow::enableUndo);
@@ -4509,8 +4511,9 @@ void MainWindow::updateTouchLayout()
     if (!display || !m_projectMonitorDock || !m_timelineDock || m_touchMovingWidgets) {
         return;
     }
-    const QSize available = display->availableSize();
-    const bool compact = KdenliveSettings::touchmode() && (available.width() < 1100 || available.width() < available.height());
+    // Touch Mode is a complete workspace, independent of the streamed desktop's
+    // resolution. A stale browser resolution must never restore desktop docks.
+    const bool compact = KdenliveSettings::touchmode();
     if (!compact) {
         leaveTouchLayout();
         return;
@@ -4548,6 +4551,12 @@ void MainWindow::updateTouchLayout()
     }
     for (QWidget *widget : {static_cast<QWidget *>(menuBar()), static_cast<QWidget *>(statusBar())}) {
         if (!widget->isHidden()) {
+            m_touchHiddenWidgets.append(widget);
+            widget->hide();
+        }
+    }
+    for (QWidget *widget : {static_cast<QWidget *>(m_timelineTabs->tabBar()), m_timelineTabs->cornerWidget()}) {
+        if (widget && !widget->isHidden()) {
             m_touchHiddenWidgets.append(widget);
             widget->hide();
         }
@@ -4651,7 +4660,7 @@ void MainWindow::showTouchPanel(KDDockWidgets::QtWidgets::DockWidget *dock)
     m_mobileWorkspace->showPanel(panel, dock->title(), dock == m_projectBinDock);
 }
 
-void MainWindow::importTouchMedia(bool audio, bool title)
+void MainWindow::importTouchMedia(bool audio, bool title, bool overlay)
 {
     auto *timeline = getCurrentTimeline();
     if (!timeline || !timeline->model()) {
@@ -4664,17 +4673,18 @@ void MainWindow::importTouchMedia(bool audio, bool title)
     if (!tracks.contains(track)) {
         track = tracks.isEmpty() ? -1 : tracks.first();
     }
-    if (track < 0 && !audio && !title) {
+    const bool separateTrack = audio || title || overlay;
+    if (track < 0 && !separateTrack) {
         return;
     }
     const auto frame = std::make_shared<int>(m_projectMonitor->position());
-    const auto destination = std::make_shared<int>(audio || title ? -1 : track);
+    const auto destination = std::make_shared<int>(separateTrack ? -1 : track);
     // Capture the timeline, not the active project: imports finish asynchronously.
     // A closed/switched project must never receive the imported media by accident.
-    pCore->bin()->setReadyCallBack([target = QPointer<TimelineWidget>(timeline), destination, frame, audio, title](const QString &clipId) {
+    pCore->bin()->setReadyCallBack([target = QPointer<TimelineWidget>(timeline), destination, frame, audio, title, separateTrack](const QString &clipId) {
         if (target && target->model()) {
             const auto candidates = target->model()->getTracksIds(audio);
-            if ((audio || title) && !candidates.contains(*destination)) {
+            if (separateTrack && !candidates.contains(*destination)) {
                 // Music and titles are layers, so do not collide with the video's
                 // existing picture or sound. Only add a track after import succeeds.
                 *destination = -1;
@@ -4685,7 +4695,8 @@ void MainWindow::importTouchMedia(bool audio, bool title)
                         break;
                     }
                 }
-                if (*destination < 0 && !target->model()->requestTrackInsertion(audio ? 0 : -1, *destination, audio ? i18n("Audio") : i18n("Text"), audio)) {
+                const QString trackName = audio ? i18n("Audio") : title ? i18n("Text") : i18n("Overlay");
+                if (*destination < 0 && !target->model()->requestTrackInsertion(audio ? 0 : -1, *destination, trackName, audio)) {
                     return;
                 }
             } else if (!candidates.contains(*destination)) {
@@ -4704,6 +4715,9 @@ void MainWindow::importTouchMedia(bool audio, bool title)
 
 void MainWindow::touchCommand(const QString &name)
 {
+    if (!m_mobileWorkspace) {
+        return;
+    }
     if (name == QLatin1String("play")) {
         m_projectMonitor->slotPlay();
     } else if (name == QLatin1String("media")) {
@@ -4714,7 +4728,14 @@ void MainWindow::touchCommand(const QString &name)
         importTouchMedia(false, true);
     } else if (name == QLatin1String("import")) {
         importTouchMedia(false);
-    } else if (name == QLatin1String("effects")) {
+    } else if (name == QLatin1String("append")) {
+        if (auto *timeline = getCurrentTimeline()) {
+            m_projectMonitor->getControllerProxy()->setPosition(timeline->controller()->duration());
+            importTouchMedia(false);
+        }
+    } else if (name == QLatin1String("overlay")) {
+        importTouchMedia(false, false, true);
+    } else if (name == QLatin1String("effects") || name == QLatin1String("filters")) {
         showTouchPanel(m_effectListDock);
     } else if (name == QLatin1String("adjust")) {
         showTouchPanel(m_effectStackDock);
@@ -4730,6 +4751,7 @@ void MainWindow::touchCommand(const QString &name)
         }
     } else if (name == QLatin1String("edit")) {
         closeTouchPanel();
+        m_mobileWorkspace->showEditTools();
     } else if (name == QLatin1String("insert")) {
         auto *timeline = getCurrentTimeline();
         if (timeline) {

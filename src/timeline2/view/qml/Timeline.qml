@@ -108,6 +108,7 @@ Rectangle {
     signal processingDrag(bool dragging)
     signal showSubtitleClipMenu()
     signal updateTimelineMousePos(int frame, int duration)
+    signal touchCommand(string name)
 
     FontMetrics {
         id: fontMetrics
@@ -142,14 +143,16 @@ Rectangle {
     }
 
     function fitZoom() {
+        if (root.mobileLayout) return Math.max(0.01, root.width * 0.8 / Math.max(root.timeline.duration, K.Core.getCurrentFps() * 5))
         return scrollView.width / (root.timeline.duration * 1.1)
     }
 
     function scrollPos() {
-        return scrollView.contentX
+        return root.mobileLayout ? touchTimeline.scrollPosition : scrollView.contentX
     }
 
     function goToStart(pos) {
+        if (root.mobileLayout) touchTimeline.restoreScroll(pos)
         scrollView.contentX = pos
     }
 
@@ -354,10 +357,11 @@ Rectangle {
     }
 
     function getScrollPos() {
-        return scrollView.contentX
+        return root.scrollPos()
     }
 
     function setScrollPos(pos) {
+        if (root.mobileLayout) touchTimeline.restoreScroll(pos)
         return scrollView.contentX = pos
     }
 
@@ -390,6 +394,7 @@ function getTrackColor(audio, header) {
 }
 
     function centerViewOnCursor() {
+        if (root.mobileLayout) touchTimeline.followPlayhead()
         scrollView.contentX = Math.max(0, root.consumerPosition * root.timeScale - (scrollView.width / 2))
     }
 
@@ -533,7 +538,7 @@ function getTrackColor(audio, header) {
     readonly property int activeTool: K.Core.activeTool
     readonly property int minClipWidthForViews: 1.5 * K.UiUtils.baseSizeMedium
     readonly property int collapsedHeight: Math.max(28, K.UiUtils.baseSizeMedium * 1.8)
-    readonly property bool mobileLayout: K.KdenliveSettings.touchmode && (Screen.width < 1100 || Screen.width < Screen.height)
+    readonly property bool mobileLayout: K.KdenliveSettings.touchmode
     readonly property int minHeaderWidth: mobileLayout ? 72 : 6 * collapsedHeight
     readonly property bool autoTrackHeight: root.timeline.autotrackHeight
     readonly property color selectedTrackColor: Qt.rgba(activePalette.highlight.r, activePalette.highlight.g, activePalette.highlight.b, 0.2)
@@ -1169,7 +1174,39 @@ function getTrackColor(audio, header) {
         }
     }
 
+    TouchTimeline {
+        id: touchTimeline
+        anchors.fill: parent
+        visible: root.mobileLayout
+        tracks: root.multitrack
+        subtitles: root.subtitleModel
+        frame: Math.max(0, root.consumerPosition)
+        duration: root.timeline.duration
+        fps: K.Core.getCurrentFps()
+        pixelsPerFrame: root.timeScale
+        compositionType: K.ClipType.Composition
+        onSeekRequested: position => { root.proxy.position = position }
+        onSelectRequested: (id, track, subtitle) => {
+            root.timeline.activeTrack = subtitle ? -2 : track
+            root.mainItemId = id
+            root.controller.requestAddToSelection(id, true)
+        }
+        onMoveRequested: (id, track, position, composition) => {
+            if (composition) root.controller.requestCompositionMove(id, track, position)
+            else root.controller.requestClipMove(id, track, position)
+        }
+        onTrimRequested: (id, size, right) => { root.controller.requestItemResize(id, size, right) }
+        onMenuRequested: (id, composition, subtitle) => {
+            root.controller.requestAddToSelection(id, true)
+            if (subtitle) root.showSubtitleClipMenu()
+            else if (composition) root.showCompositionMenu()
+            else root.showClipMenu(id)
+        }
+        onCommand: name => root.touchCommand(name)
+    }
     Row {
+        visible: !root.mobileLayout
+        enabled: !root.mobileLayout
         Column {
             id: headerContainer
             width: root.headerWidth

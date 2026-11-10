@@ -11,6 +11,13 @@
 #include <QSplitter>
 #include <QToolButton>
 #include <QPushButton>
+#include <QPainter>
+#include <QQuickItem>
+#include <QQuickWidget>
+#include <QQuickImageProvider>
+#include <QQmlEngine>
+#include <QQmlComponent>
+#include <QStandardItemModel>
 #include <QVBoxLayout>
 #include <QtTest>
 #ifdef CHECK_KDDOCK
@@ -20,10 +27,161 @@
 #include <kddockwidgets/Config.h>
 #endif
 
+static QImage sampleFrame()
+{
+    QImage frame(270, 480, QImage::Format_RGB32);
+    QPainter p(&frame);
+    QLinearGradient sky(0, 0, 0, 480);
+    sky.setColorAt(0, QColor("#477a8c"));
+    sky.setColorAt(0.5, QColor("#c8c6a7"));
+    sky.setColorAt(1, QColor("#385947"));
+    p.fillRect(frame.rect(), sky);
+    p.setPen(QColor("#e3e9de"));
+    p.drawText(frame.rect(), Qt::AlignCenter, QStringLiteral("PREVIEW SAMPLE"));
+    return frame;
+}
+
+class SampleThumbnails : public QQuickImageProvider
+{
+public:
+    SampleThumbnails() : QQuickImageProvider(QQuickImageProvider::Image) {}
+    QImage requestImage(const QString &, QSize *size, const QSize &) override
+    {
+        const QImage frame = sampleFrame();
+        if (size) *size = frame.size();
+        return frame;
+    }
+};
+
+class SamplePreview : public QWidget
+{
+public:
+    using QWidget::QWidget;
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter p(this);
+        p.fillRect(rect(), QColor("#121212"));
+        const QImage frame = sampleFrame();
+        const QSize fitted = frame.size().scaled(size() - QSize(20, 12), Qt::KeepAspectRatio);
+        const QRect target(QPoint((width() - fitted.width()) / 2, (height() - fitted.height()) / 2), fitted);
+        p.drawImage(target, frame);
+    }
+};
+
+static QQuickItem *visualItem(QQuickItem *root, const QString &name)
+{
+    if (root->objectName() == name) return root;
+    for (auto *child : root->childItems()) {
+        if (auto *found = visualItem(child, name)) return found;
+    }
+    return nullptr;
+}
+
 class MobileChecks : public QObject
 {
     Q_OBJECT
 private Q_SLOTS:
+    void scrollingTimeline()
+    {
+        QStandardItemModel tracks;
+        QHash<int, QByteArray> roles;
+        const QList<QByteArray> names{"item", "audio", "locked", "start", "duration", "name", "clipType", "selected", "in", "speed", "clipThumbId"};
+        for (int i = 0; i < names.size(); ++i) roles.insert(Qt::UserRole + i, names.at(i));
+        tracks.setItemRoleNames(roles);
+        auto makeItem = [&](const QVariantList &values) {
+            auto *item = new QStandardItem;
+            for (int i = 0; i < values.size(); ++i) item->setData(values.at(i), Qt::UserRole + i);
+            return item;
+        };
+        auto *videoTrack = makeItem({10, false, false, 0, 240, "Video", 14, false, 0, 1., ""});
+        auto *video = makeItem({101, false, false, 0, 240, "Example video", 2, false, 0, 1., "1/#"});
+        videoTrack->appendRow(video);
+        tracks.appendRow(videoTrack);
+        auto *audioTrack = makeItem({20, true, false, 0, 150, "Audio", 14, false, 0, 1., ""});
+        audioTrack->appendRow(makeItem({102, true, false, 30, 120, "Background audio", 1, false, 0, 1., ""}));
+        tracks.appendRow(audioTrack);
+        auto *view = new QQuickWidget;
+        view->setResizeMode(QQuickWidget::SizeRootObjectToView);
+        view->engine()->addImageProvider(QStringLiteral("thumbnail"), new SampleThumbnails);
+        QSignalSpy warnings(view->engine(), &QQmlEngine::warnings);
+        const QUrl source = QUrl::fromLocalFile(QStringLiteral(KDENCUT_SOURCE_DIR "/src/timeline2/view/qml/TouchTimeline.qml"));
+        auto *component = new QQmlComponent(view->engine(), source, view);
+        auto *content = component->createWithInitialProperties({{"tracks", QVariant::fromValue(&tracks)}, {"subtitles", QVariantList()},
+                                                               {"frame", 0}, {"duration", 240}, {"fps", 30.}, {"pixelsPerFrame", 2.}, {"compositionType", 13}});
+        QVERIFY2(content, qPrintable(component->errorString()));
+        view->setContent(source, component, content);
+        QCOMPARE(view->status(), QQuickWidget::Ready);
+        QMap<QString, QAction *> actions;
+        for (const auto &id : {"file_save", "project_render", "edit_undo", "edit_redo", "cut_timeline_clip", "delete_timeline_selection", "duplicate_timeline_clip", "zoom_fit", "view_zoom_in", "view_zoom_out"}) {
+            actions.insert(QString::fromLatin1(id), new QAction(this));
+        }
+        auto *preview = new SamplePreview;
+        preview->setMinimumSize(160, 90);
+        KdenCut::MobileWorkspace workspace(preview, view, actions);
+        workspace.resize(430, 876);
+        workspace.show();
+        QTest::qWait(80);
+        auto *root = view->rootObject();
+        auto *canvas = visualItem(root, QStringLiteral("touchTimelineScroll"));
+        QVERIFY(canvas);
+        auto *playhead = visualItem(root, QStringLiteral("touchPlayhead"));
+        QVERIFY(playhead);
+        QCOMPARE(playhead->x() + 1, view->width() / 2.);
+        QSignalSpy seeks(root, SIGNAL(seekRequested(int)));
+        QSignalSpy selects(root, SIGNAL(selectRequested(int,int,bool)));
+        QSignalSpy moves(root, SIGNAL(moveRequested(int,int,int,bool)));
+        QSignalSpy trims(root, SIGNAL(trimRequested(int,int,bool)));
+        QVERIFY(seeks.isValid() && selects.isValid() && moves.isValid() && trims.isValid());
+
+        // A swipe over a clip scrolls and seeks; it must not edit the project.
+        QTest::mousePress(view, Qt::LeftButton, Qt::NoModifier, QPoint(350, 88));
+        for (int x = 340; x >= 150; x -= 10) QTest::mouseMove(view, QPoint(x, 88), 15);
+        QTest::mouseRelease(view, Qt::LeftButton, Qt::NoModifier, QPoint(150, 88));
+        QTest::qWait(150);
+        QVERIFY(canvas->property("contentX").toReal() > 50);
+        QVERIFY(!seeks.isEmpty());
+        QVERIFY(moves.isEmpty());
+        QCOMPARE(playhead->x() + 1, view->width() / 2.);
+        QMetaObject::invokeMethod(canvas, "cancelFlick");
+        canvas->setProperty("contentX", 0);
+        QTest::qWait(30);
+
+        QTest::mouseClick(view, Qt::LeftButton, Qt::NoModifier, QPoint(290, 88));
+        QVERIFY(!selects.isEmpty());
+        QCOMPARE(selects.last().at(0).toInt(), 101);
+        video->setData(true, Qt::UserRole + names.indexOf("selected"));
+        QTest::qWait(30);
+
+        // Reordering requires a deliberate hold, and commits only on release.
+        QTest::mousePress(view, Qt::LeftButton, Qt::NoModifier, QPoint(290, 88));
+        QTest::qWait(520);
+        QVERIFY(root->property("editingClip").toBool());
+        QTest::mouseMove(view, QPoint(350, 88), 30);
+        QVERIFY(moves.isEmpty());
+        QTest::mouseRelease(view, Qt::LeftButton, Qt::NoModifier, QPoint(350, 88));
+        QCOMPARE(moves.size(), 1);
+        QCOMPARE(moves.first().at(0).toInt(), 101);
+        QCOMPARE(moves.first().at(2).toInt(), 30);
+        QVERIFY(!root->property("editingClip").toBool());
+
+        QTest::mousePress(view, Qt::LeftButton, Qt::NoModifier, QPoint(215, 88));
+        QTest::mouseMove(view, QPoint(245, 88), 30);
+        QVERIFY(trims.isEmpty());
+        QTest::mouseRelease(view, Qt::LeftButton, Qt::NoModifier, QPoint(245, 88));
+        QCOMPARE(trims.size(), 1);
+        QCOMPARE(trims.first().at(0).toInt(), 101);
+        QCOMPARE(trims.first().at(1).toInt(), 225);
+        QCOMPARE(trims.first().at(2).toBool(), false);
+        QVERIFY(!root->property("editingClip").toBool());
+
+        video->setData(false, Qt::UserRole + names.indexOf("selected"));
+        QTest::qWait(50);
+        if (const auto screenshot = qEnvironmentVariable("KDENCUT_TOUCH_SCREENSHOT"); !screenshot.isEmpty()) {
+            QVERIFY(workspace.grab().save(screenshot));
+        }
+        QVERIFY(warnings.isEmpty());
+    }
 #ifdef CHECK_KDDOCK
     void dockHandoff()
     {
@@ -111,7 +269,7 @@ private Q_SLOTS:
         auto *timeline = new QLabel(QStringLiteral("Timeline"));
         KdenCut::MobileWorkspace workspace(preview, timeline, actions);
         workspace.show();
-        for (const QSize &size : {QSize(320, 568), QSize(375, 667), QSize(430, 876), QSize(932, 374), QSize(430, 344), QSize(430, 876)}) {
+        for (const QSize &size : {QSize(320, 568), QSize(375, 667), QSize(430, 876), QSize(932, 374), QSize(1280, 720), QSize(430, 344), QSize(430, 876)}) {
             workspace.resize(size);
             QTest::qWait(20);
             QCOMPARE(workspace.size(), size);
@@ -127,12 +285,19 @@ private Q_SLOTS:
         }
         QSignalSpy splitSpy(actions.value(QStringLiteral("cut_timeline_clip")), &QAction::triggered);
         auto *split = workspace.findChild<QToolButton *>(QStringLiteral("mobile_cut_timeline_clip"));
+        QVERIFY(!split->isVisible());
+        workspace.showEditTools();
+        QVERIFY(split->isVisible());
         split->click();
         QCOMPARE(splitSpy.count(), 1);
         actions.value(QStringLiteral("cut_timeline_clip"))->setEnabled(false);
         QVERIFY(!split->isEnabled());
         split->click();
         QCOMPARE(splitSpy.count(), 1);
+        workspace.findChild<QToolButton *>(QStringLiteral("mobile_tools"))->click();
+        QVERIFY(!split->isVisible());
+        auto *captions = workspace.findChild<QToolButton *>(QStringLiteral("mobile_captions"));
+        QVERIFY(captions->width() >= captions->fontMetrics().horizontalAdvance(captions->text()) + 12);
 
         // A wide desktop panel scrolls inside the sheet without widening the phone.
         auto *panel = new QLabel(QStringLiteral("Effect settings"));

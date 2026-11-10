@@ -1,9 +1,12 @@
 """Install the mobile viewport adapter into the image's Selkies dashboards."""
 from pathlib import Path
+import hashlib
+import re
 import shutil
 
 
 def install(root=Path('/usr/share/selkies'), assets=Path(__file__).parent):
+    version = hashlib.sha256((assets / 'mobile.js').read_bytes() + (assets / 'mobile.css').read_bytes()).hexdigest()[:12]
     pages = list(root.glob('*/index.html'))
     if not pages:
         raise RuntimeError('No Selkies dashboard index.html found; mobile UI was not installed')
@@ -17,7 +20,11 @@ def install(root=Path('/usr/share/selkies'), assets=Path(__file__).parent):
 </head>''', 1)
             # Existing Selkies viewport content is otherwise preserved.
             source = source.replace('name="viewport" content="', 'name="viewport" content="viewport-fit=cover, ', 1)
-            page.write_text(source)
+        # Existing sessions can otherwise retain the old desktop resolution adapter.
+        for suffix in ('css', 'js'):
+            source = re.sub(r'kdencut-mobile\.' + suffix + r'(?:\?[^"\s>]*)?',
+                            f'kdencut-mobile.{suffix}?v={version}', source)
+        page.write_text(source)
         for suffix in ('css', 'js'):
             shutil.copyfile(assets / f'mobile.{suffix}', page.parent / f'kdencut-mobile.{suffix}')
     return len(pages)

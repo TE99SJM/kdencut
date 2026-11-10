@@ -29,7 +29,7 @@ class TouchMode : public QObject
 
 public:
     /** Bump when the default look changes, so existing users get it applied once. */
-    static constexpr int LookVersion = 1;
+    static constexpr int LookVersion = 2;
     /** Scheme id understood by KColorSchemeManager (file base name). */
     static QString colorSchemeId();
 

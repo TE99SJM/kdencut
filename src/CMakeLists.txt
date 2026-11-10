@@ -182,6 +182,8 @@ ecm_target_qml_sources(kdenliveLib
     monitor/view/RotationHandle.qml
     monitor/view/Utils.js
     timeline2/view/qml/Timeline.qml
+    timeline2/view/qml/TouchTimeline.qml
+    timeline2/view/qml/TouchTimelineClip.qml
     timeline2/view/qml/TimelineLogic.js
     timeline2/view/qml/TrackHead.qml
     timeline2/view/qml/SubtitleTrackHead.qml
