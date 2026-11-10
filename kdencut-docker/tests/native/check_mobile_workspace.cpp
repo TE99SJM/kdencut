@@ -14,6 +14,7 @@
 #include <QPainter>
 #include <QQuickItem>
 #include <QQuickWidget>
+#include <QWindow>
 #include <QQuickImageProvider>
 #include <QQmlEngine>
 #include <QQmlComponent>
@@ -82,6 +83,35 @@ class MobileChecks : public QObject
 {
     Q_OBJECT
 private Q_SLOTS:
+    void toolSwipe()
+    {
+        KdenCut::MobileWorkspace workspace(new QLabel("Preview"), new QLabel("Timeline"), {});
+        workspace.resize(430, 876);
+        workspace.show();
+        QTest::qWait(100);
+        auto *edit = workspace.findChild<QToolButton *>(QStringLiteral("mobile_edit"));
+        QScrollArea *strip = nullptr;
+        for (auto *area : workspace.findChildren<QScrollArea *>()) {
+            if (area->isAncestorOf(edit)) { strip = area; break; }
+        }
+        QVERIFY(strip);
+        QVERIFY(strip->horizontalScrollBar()->maximum() > 0);
+        const QPoint start = strip->viewport()->mapTo(&workspace, QPoint(350, 30));
+        auto *target = workspace.childAt(start);
+        QVERIFY(target);
+        QSignalSpy commands(&workspace, &KdenCut::MobileWorkspace::command);
+        QTest::mousePress(workspace.windowHandle(), Qt::LeftButton, Qt::NoModifier, start);
+        for (int x = 340; x >= 90; x -= 10) {
+            const QPoint pos = strip->viewport()->mapTo(&workspace, QPoint(x, 30));
+            QTest::mouseMove(workspace.windowHandle(), pos, 15);
+        }
+        const QPoint end = strip->viewport()->mapTo(&workspace, QPoint(90, 30));
+        QTest::mouseRelease(workspace.windowHandle(), Qt::LeftButton, Qt::NoModifier, end);
+        QTest::qWait(100);
+        QVERIFY(strip->horizontalScrollBar()->value() > 50);
+        QVERIFY(commands.isEmpty());
+    }
+
     void scrollingTimeline()
     {
         QStandardItemModel tracks;
@@ -176,6 +206,14 @@ private Q_SLOTS:
         QVERIFY(!root->property("editingClip").toBool());
 
         video->setData(false, Qt::UserRole + names.indexOf("selected"));
+        auto *thumbs = visualItem(root, QStringLiteral("touchThumbnails"));
+        QVERIFY(thumbs);
+        QVERIFY(thumbs->property("count").toInt() > 0);
+        QVERIFY(thumbs->property("count").toInt() <= 9);
+        video->setData(1000, Qt::UserRole + names.indexOf("start"));
+        QTRY_COMPARE(thumbs->property("count").toInt(), 0);
+        video->setData(0, Qt::UserRole + names.indexOf("start"));
+        QTRY_VERIFY(thumbs->property("count").toInt() > 0);
         QTest::qWait(50);
         if (const auto screenshot = qEnvironmentVariable("KDENCUT_TOUCH_SCREENSHOT"); !screenshot.isEmpty()) {
             QVERIFY(workspace.grab().save(screenshot));

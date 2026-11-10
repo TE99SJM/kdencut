@@ -44,8 +44,10 @@ Item {
         clip: true
         Repeater {
             id: thumbs
+            objectName: "touchThumbnails"
             readonly property int first: Math.max(0, Math.floor((clip.viewportStart - clip.x) / 64))
-            model: clip.audio || clip.thumbnail === "" ? 0 : Math.max(0, Math.min(Math.ceil(clip.width / 64) - first, Math.ceil(clip.viewportWidth / 64) + 2))
+            model: !clip.visible || clip.audio || clip.thumbnail === "" || clip.x > clip.viewportStart + clip.viewportWidth || clip.x + clip.width < clip.viewportStart
+                   ? 0 : Math.max(0, Math.min(Math.ceil(clip.width / 64) - first, Math.ceil(clip.viewportWidth / 64) + 2))
             delegate: Image {
                 required property int index
                 x: (thumbs.first + index) * 64
