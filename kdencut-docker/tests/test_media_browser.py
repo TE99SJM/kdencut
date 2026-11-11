@@ -21,7 +21,7 @@ class BrowserMediaTests(unittest.TestCase):
         class Handler(media.Handler):
             def do_GET(self):
                 if self.path == '/':
-                    body = b'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/media.css"></head><body><script defer src="/media.js"></script></body></html>'
+                    body = b'<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/media.css"></head><body><script defer src="/media.js"></script></body></html>'
                 elif self.path in ('/media.js', '/media.css'):
                     body = (ASSETS/self.path[1:]).read_bytes()
                 else:
@@ -58,6 +58,10 @@ class BrowserMediaTests(unittest.TestCase):
         media.atomic_json(self.root/'bridge/request.json', {'id': self.id, 'created': time.time()*1000, 'kind': 'media'})
         self.page.goto(self.url)
         self.page.locator('#kdencut-media-dialog').wait_for(state='visible')
+
+    def tearDown(self):
+        # Keep actual chooser content in CI logs if a folder or action is missing.
+        print(self.page.locator('#kdencut-media-dialog').inner_text())
 
     def wait_result(self):
         result = self.root/f'bridge/{self.id}.json'
