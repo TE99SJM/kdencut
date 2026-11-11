@@ -538,6 +538,16 @@ QList<int> TimelineController::insertClips(int tid, int position, const QStringL
     if (tid == -1) {
         tid = m_activeTrack;
     }
+    // Subtitle selection uses -2, and a deleted track can leave a stale ID.
+    // Reject either before insertion code dereferences a TrackModel.
+    if (!m_model || !m_model->isTrack(tid)) {
+        pCore->displayMessage(i18n("No available track for insert operation"), ErrorMessage, 500);
+        return clipIds;
+    }
+    if (m_model->getTrackById_const(tid)->isLocked()) {
+        pCore->displayMessage(i18n("Cannot insert clips into a locked track"), ErrorMessage, 500);
+        return clipIds;
+    }
     if (position == -1) {
         position = pCore->getMonitorPosition();
     }

@@ -83,6 +83,42 @@ class MobileChecks : public QObject
 {
     Q_OBJECT
 private Q_SLOTS:
+    void panelExitsExpandedPreview()
+    {
+        auto *preview = new QLabel(QStringLiteral("Preview"));
+        auto *timeline = new QLabel(QStringLiteral("Timeline"));
+        KdenCut::MobileWorkspace workspace(preview, timeline, {});
+        workspace.resize(430, 876);
+        workspace.show();
+        QTest::qWait(20);
+        auto *expand = workspace.findChild<QToolButton *>(QStringLiteral("mobile_preview"));
+        auto *edit = workspace.findChild<QToolButton *>(QStringLiteral("mobile_edit"));
+        QVERIFY(expand && edit);
+        expand->click();
+        QVERIFY(!timeline->isVisible());
+        QVERIFY(!edit->isVisible());
+
+        // The Media header action stays accessible in expanded preview. Opening
+        // it must reveal the selected panel instead of leaving it hidden.
+        auto *panel = new QLabel(QStringLiteral("Media"));
+        workspace.showPanel(panel, QStringLiteral("Media"), true);
+        QTest::qWait(20);
+        QVERIFY(panel->isVisible());
+        QVERIFY(edit->isVisible());
+        QVERIFY(workspace.rect().contains(QRect(panel->mapTo(&workspace, QPoint()), panel->size())));
+
+        // Expand/collapse still works after the panel has restored editing.
+        expand->click();
+        QVERIFY(!panel->isVisible());
+        QVERIFY(!edit->isVisible());
+        expand->click();
+        QVERIFY(panel->isVisible());
+        QVERIFY(edit->isVisible());
+        QCOMPARE(workspace.takePanel(), panel);
+        QVERIFY(timeline->isVisible());
+        delete panel;
+    }
+
     void toolSwipe()
     {
         KdenCut::MobileWorkspace workspace(new QLabel("Preview"), new QLabel("Timeline"), {});
@@ -221,6 +257,22 @@ private Q_SLOTS:
         if (const auto screenshot = qEnvironmentVariable("KDENCUT_TOUCH_SCREENSHOT"); !screenshot.isEmpty()) {
             QVERIFY(workspace.grab().save(screenshot));
         }
+        // Keep the playhead aligned at the end of a short sequence even when
+        // the seek does not change its frame (the ruler has a five-second floor).
+        tracks.removeRow(1);
+        video->setData(30, Qt::UserRole + names.indexOf("duration"));
+        root->setProperty("duration", 30);
+        root->setProperty("frame", 30);
+        QTest::qWait(30);
+        QTest::mousePress(view, Qt::LeftButton, Qt::NoModifier, QPoint(350, 88));
+        for (int x = 340; x >= 150; x -= 10) {
+            QTest::mouseMove(view, QPoint(x, 88), 15);
+            QTest::qWait(16);
+        }
+        QTest::mouseRelease(view, Qt::LeftButton, Qt::NoModifier, QPoint(150, 88));
+        QTRY_VERIFY(!canvas->property("moving").toBool());
+        QCOMPARE(canvas->property("contentX").toReal(), 60.);
+        QCOMPARE(seeks.last().at(0).toInt(), 30);
         QVERIFY(warnings.isEmpty());
     }
 #ifdef CHECK_KDDOCK

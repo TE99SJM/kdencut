@@ -4702,7 +4702,7 @@ void MainWindow::importTouchMedia(bool audio, bool title, bool overlay)
             } else if (!candidates.contains(*destination)) {
                 return;
             }
-            const auto inserted = target->controller()->insertClips(*destination, *frame, QStringList(clipId), true, true);
+            const auto inserted = target->controller()->insertClips(*destination, *frame, QStringList(audio ? QStringLiteral("A") + clipId : clipId), true, true);
             for (int id : inserted) {
                 *frame = qMax(*frame, target->model()->getClipPosition(id) + target->model()->getClipPlaytime(id));
             }
@@ -4754,14 +4754,63 @@ void MainWindow::touchCommand(const QString &name)
         m_mobileWorkspace->showEditTools();
     } else if (name == QLatin1String("insert")) {
         auto *timeline = getCurrentTimeline();
-        if (timeline) {
+        if (timeline && timeline->model()) {
             QStringList ids;
             for (const QString &id : pCore->bin()->selectedClipsIds(true)) {
                 ids.append(id);
             }
             if (!ids.isEmpty()) {
-                timeline->controller()->insertClips(timeline->controller()->activeTrack(), m_projectMonitor->position(), ids, true, true);
-                closeTouchPanel();
+                bool canUseAudio = true;
+                bool canUseVideo = true;
+                for (const QString &id : std::as_const(ids)) {
+                    // Subclips carry /in/out suffixes. Preserve them for insertion
+                    // while looking up the source's audio/video capabilities.
+                    QString sourceId = id.section(QLatin1Char('/'), 0, 0);
+                    const bool audioOnly = sourceId.startsWith(QLatin1Char('A'));
+                    const bool videoOnly = sourceId.startsWith(QLatin1Char('V'));
+                    if (audioOnly || videoOnly) {
+                        sourceId.remove(0, 1);
+                    }
+                    const auto clip = pCore->projectItemModel()->getClipByBinID(sourceId);
+                    if (!clip) {
+                        KMessageBox::information(this, i18n("The selected media is no longer available."));
+                        return;
+                    }
+                    canUseAudio = canUseAudio && !videoOnly && clip->hasAudio();
+                    canUseVideo = canUseVideo && !audioOnly && clip->hasVideo();
+                }
+                if (!canUseAudio && !canUseVideo) {
+                    KMessageBox::information(this, i18n("Add audio clips and video clips separately so each can use a compatible track."));
+                    return;
+                }
+                const auto model = timeline->model();
+                int track = timeline->controller()->activeTrack();
+                const bool validTrack = model->isTrack(track);
+                const bool audioTrack = canUseAudio && (!canUseVideo || (validTrack && model->isAudioTrack(track)));
+                const auto candidates = model->getTracksIds(audioTrack);
+                const auto usable = [&model, &candidates](int candidate) {
+                    return candidates.contains(candidate) && model->getTrackProperty(candidate, QStringLiteral("kdenlive:locked")).toInt() == 0;
+                };
+                if (!usable(track)) {
+                    track = -1;
+                    for (int candidate : candidates) {
+                        if (usable(candidate)) {
+                            track = candidate;
+                            break;
+                        }
+                    }
+                    if (track < 0 && !model->requestTrackInsertion(audioTrack ? 0 : -1, track, audioTrack ? i18n("Audio") : i18n("Video"), audioTrack)) {
+                        KMessageBox::information(this, i18n("Could not create a track for the selected media."));
+                        return;
+                    }
+                }
+                const auto inserted = timeline->controller()->insertClips(track, m_projectMonitor->position(), ids, true, true);
+                if (!inserted.isEmpty()) {
+                    timeline->controller()->setActiveTrack(track);
+                    closeTouchPanel();
+                } else {
+                    KMessageBox::information(this, i18n("The selected media could not be added at the playhead. Try an empty part of the timeline."));
+                }
             }
         }
     } else if (name == QLatin1String("file_open")) {

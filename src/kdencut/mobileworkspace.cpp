@@ -379,6 +379,9 @@ void MobileWorkspace::showPanel(QWidget *panel, const QString &title, bool media
     m_mediaTools->setVisible(media);
     m_panelScroll->setWidget(panel);
     m_lower->setCurrentWidget(m_panelPage);
+    // Opening a tool is an explicit return from expanded preview to editing.
+    m_lower->show();
+    m_tools->show();
     showEditor();
 }
 

@@ -78,7 +78,11 @@ Rectangle {
         }
         onMovementEnded: {
             scrubTimer.stop()
-            touch.seekRequested(Math.max(0, Math.min(touch.duration, Math.round(contentX / touch.scale))))
+            const finalFrame = Math.max(0, Math.min(touch.duration, Math.round(contentX / touch.scale)))
+            // A seek clamped to the current frame emits no frameChanged signal.
+            // Align the strip explicitly after overscrolling a short sequence.
+            contentX = finalFrame * touch.scale
+            touch.seekRequested(finalFrame)
         }
         Timer {
             id: scrubTimer
@@ -198,12 +202,12 @@ Rectangle {
                         required property var model
                         height: row.height
                         clipId: model.item
-                        trackId: row.model.item
+                        trackId: row.model.item ?? -1
                         startFrame: model.start
                         durationFrames: model.duration
                         name: model.name
-                        audio: row.model.audio
-                        locked: row.model.locked
+                        audio: row.model.audio ?? false
+                        locked: row.model.locked ?? true
                         composition: model.clipType === touch.compositionType
                         selected: model.selected
                         inFrame: model.in || 0
