@@ -7,6 +7,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include "mainwindow.h"
 #include "kdencut/touchmode.h"
 #include "kdencut/mobileworkspace.h"
+#include "kdencut/mediaimportbridge.h"
 #include "monitor/monitorproxy.h"
 #include "assets/assetpanel.hpp"
 #include "audiomixer/mixermanager.hpp"
@@ -4681,7 +4682,7 @@ void MainWindow::importTouchMedia(bool audio, bool title, bool overlay)
     const auto destination = std::make_shared<int>(separateTrack ? -1 : track);
     // Capture the timeline, not the active project: imports finish asynchronously.
     // A closed/switched project must never receive the imported media by accident.
-    pCore->bin()->setReadyCallBack([target = QPointer<TimelineWidget>(timeline), destination, frame, audio, title, separateTrack](const QString &clipId) {
+    const auto ready = [target = QPointer<TimelineWidget>(timeline), destination, frame, audio, title, separateTrack](const QString &clipId) {
         if (target && target->model()) {
             const auto candidates = target->model()->getTracksIds(audio);
             if (separateTrack && !candidates.contains(*destination)) {
@@ -4707,10 +4708,23 @@ void MainWindow::importTouchMedia(bool audio, bool title, bool overlay)
                 *frame = qMax(*frame, target->model()->getClipPosition(id) + target->model()->getClipPlaytime(id));
             }
         }
-    });
-    if (auto *action = actionCollection()->action(title ? QStringLiteral("add_text_clip") : QStringLiteral("add_clip"))) {
-        action->trigger();
-    }
+    };
+    const QPointer<KdenliveDoc> document(pCore->currentDoc());
+    const QPointer<TimelineWidget> target(timeline);
+    const auto serverPicker = [this, document, target, title, ready]() {
+        if (!document || document != pCore->currentDoc() || !target || target != getCurrentTimeline()) return;
+        pCore->bin()->setReadyCallBack(ready);
+        if (auto *action = actionCollection()->action(title ? QStringLiteral("add_text_clip") : QStringLiteral("add_clip"))) action->trigger();
+    };
+    if (!title && KdenCut::chooseBrowserMedia(this, document, audio ? QStringLiteral("audio") : QStringLiteral("media"),
+            [document, target, ready](const QStringList &paths) {
+                if (!document || document != pCore->currentDoc() || !target || target != pCore->window()->getCurrentTimeline()) return;
+                QList<QUrl> urls;
+                for (const auto &path : paths) urls.append(QUrl::fromLocalFile(path));
+                // Pass the callback directly: another import cannot steal a pending browser import.
+                ClipCreator::createClipsFromList(urls, true, pCore->bin()->getCurrentFolder(), pCore->projectItemModel(), ready);
+            }, serverPicker)) return;
+    serverPicker();
 }
 
 void MainWindow::touchCommand(const QString &name)

@@ -83,6 +83,7 @@ list(APPEND kdenlive_SRCS
     powermanagementinterface.cpp
     kdencut/touchmode.cpp
     kdencut/mobileworkspace.cpp
+    kdencut/mediaimportbridge.cpp
 )
 
 if(CRASH_AUTO_TEST)

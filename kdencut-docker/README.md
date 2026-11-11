@@ -43,6 +43,46 @@ cd ~/kdencut/kdencut-docker && docker compose down
 
 ## Phone display fixes
 
+### Phone uploads and NAS storage
+
+In the touch workspace, **Media > Import**, **Add video**, **Audio**, and **Overlay**
+open a portrait-friendly browser media chooser on **Server / NAS**. Storage and
+folder controls sit above a single vertical file list, with file sizes under
+wrapping filenames and a full-width **Add selected** button that stays in view
+while scrolling. **This device > Photos / Videos** uses the phone's
+native library picker; **Browse Files** opens the device's standard file picker.
+Select several files at once. Progress is shown while their bytes upload to the
+server, and completed files are added to the project/timeline. Cancelling the
+native picker leaves the chooser open. Cancelling an import removes unfinished
+copies. Keep the project open until the import finishes.
+
+**Server / NAS** lists the existing `/media` mount and prior uploaded/downloaded
+media. Use **+ NAS** to save an SMB2/SMB3 connection: a hostname or IPv4 address,
+share name, and optional username/password. For `\\\\MNAS\\Video`, enter `MNAS`
+as the address and `Video` as the share. Credentials are checked before saving,
+kept in an owner-only server file, and never returned to the browser. **Forget**
+removes the saved connection without deleting imported media.
+
+Direct SMB connections default to port 445 (custom ports are supported) and download selected files into persistent
+local storage before importing them. No host mount or privileged container is
+needed. Files already mounted under `/media` can be imported in place. NFS and
+other host-mounted storage remain usable through that mount or **Open server file
+picker**. The app does not mount NFS shares itself.
+
+Uploads and SMB copies live under `CONFIG_DIR/KdenCut/Imports`, each in a unique
+folder so equal filenames never overwrite one another. Retain those files while
+a project references them. NAS originals are only read, never changed or deleted.
+Insufficient disk space, disconnected shares, and failed transfers are reported
+in the chooser. Each file can be up to 100 GiB; available server disk space is
+checked before transfer. Uploads are streamed to disk rather than held in RAM.
+
+The chooser and its API use the same origin and login as the editor. Rebuild and
+recreate the container, then reload the browser after updating. The browser tests
+exercise native file-input activation, multiple file uploads, folder selection,
+phone sizing, and cancellation. CI also tests a real local SMB2 share and the
+compiled native project-lifetime bridge; an iPhone and the actual NAS still need
+an installation check.
+
 Touch clients reserve a separate bottom strip for the keyboard button and fit the
 stream to Safari's visible viewport, including rotation and the software keyboard.
 The streamed desktop now uses phone-sized logical pixels at 96 DPI (minimum

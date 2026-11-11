@@ -1,0 +1,2 @@
+#!/usr/bin/with-contenv bash
+exec s6-setuidgid abc /opt/kdencut-media/bin/python /usr/local/share/kdencut/media_server.py

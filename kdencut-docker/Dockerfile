@@ -7,6 +7,7 @@ ARG MLT_VERSION=v7.42.0
 ARG BUILD_JOBS=0
 
 ENV TITLE=KdenCut \
+    KDENCUT_MEDIA_BRIDGE=/config/.local/share/kdencut/media-bridge \
     NO_GAMEPAD=true \
     DEBIAN_FRONTEND=noninteractive
 
@@ -63,8 +64,13 @@ RUN \
   rm -rf /tmp/kdencut /tmp/kdencut-build /root/.cache
 
 # Autostart KdenCut in the web desktop
+RUN apt-get update && apt-get install -y --no-install-recommends python3-venv && \
+    python3 -m venv /opt/kdencut-media && \
+    /opt/kdencut-media/bin/pip install --no-cache-dir smbprotocol==1.15.0 && \
+    rm -rf /var/lib/apt/lists/*
 COPY kdencut-docker/root /
-RUN python3 /usr/local/share/kdencut/install-web-ui.py
+RUN chmod +x /etc/s6-overlay/s6-rc.d/svc-kdencut-media/run && \
+    python3 /usr/local/share/kdencut/install-web-ui.py
 
 EXPOSE 3000 3001
 VOLUME /config

@@ -2,7 +2,7 @@ name: KdenCut container build
 
 on:
   push:
-    branches: [kdencut-touch-capcut, kdencut-mobile-layout]
+    branches: [kdencut-touch-capcut, kdencut-mobile-layout, kdencut-device-nas-import]
     paths:
       - 'src/**'
       - 'kdencut-docker/**'
@@ -37,3 +37,30 @@ jobs:
             cmake --build /tmp/mobile-checks -j 2 &&
             QT_QPA_PLATFORM=offscreen ctest --test-dir /tmp/mobile-checks --output-on-failure
           '
+      - name: Check packaged media service and editor login
+        run: python3 kdencut-docker/tests/test_media_container.py
+  media:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check uploads and NAS file handling
+        run: python3 -m unittest discover -s kdencut-docker/tests -p test_media_server.py -v
+      - name: Install media integration test dependencies
+        run: |
+          python3 -m venv /tmp/media-tests
+          /tmp/media-tests/bin/pip install playwright smbprotocol==1.15.0 impacket==0.13.0
+          /tmp/media-tests/bin/playwright install --with-deps chromium
+      - name: Check native browser picker and uploads
+        env:
+          KDENCUT_MEDIA_SCREENSHOT: /tmp/kdencut-media-chooser.png
+        run: /tmp/media-tests/bin/python -m unittest discover -s kdencut-docker/tests -p test_media_browser.py -v
+      - name: Check real SMB share downloads
+        run: /tmp/media-tests/bin/python -m unittest discover -s kdencut-docker/tests -p test_media_smb.py -v
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: media-chooser-preview
+          path: /tmp/kdencut-media-chooser*.png

@@ -115,8 +115,9 @@ class MobileInstallerTest(unittest.TestCase):
             self.assertIn('kdencut-mobile.css?v=',first)
             changed = root / 'assets'
             changed.mkdir()
-            for suffix in ('js', 'css'):
-                shutil.copyfile(ASSETS / f'mobile.{suffix}', changed / f'mobile.{suffix}')
+            for name in ('mobile', 'media'):
+                for suffix in ('js', 'css'):
+                    shutil.copyfile(ASSETS / f'{name}.{suffix}', changed / f'{name}.{suffix}')
             with (changed / 'mobile.js').open('a') as script:
                 script.write('\n// new version\n')
             module.install(root,changed)
