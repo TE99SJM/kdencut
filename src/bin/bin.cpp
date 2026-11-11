@@ -946,7 +946,8 @@ void MyListView::dropEvent(QDropEvent *event)
                 isSameRoot = true;
             }
             // Check if we are dropping from same bin
-            pCore->projectItemModel()->dropBinSource = parentWidget()->parentWidget()->objectName();
+            auto *bin = qobject_cast<Bin *>(parentWidget());
+            pCore->projectItemModel()->dropBinSource = bin && bin->dockWidget() ? bin->dockWidget()->objectName() : QString();
             if (isSameRoot && !indexAt(event->position().toPoint()).isValid()) {
                 event->ignore();
                 return;
@@ -1173,7 +1174,8 @@ void MyTreeView::dropEvent(QDropEvent *event)
         // Internal drag/drop, ensure it is not a zone drop
         if (!QString(event->mimeData()->data(QStringLiteral("text/producerslist"))).contains(QLatin1Char('/'))) {
             // Check if we are dropping from same bin
-            pCore->projectItemModel()->dropBinSource = parentWidget()->parentWidget()->objectName();
+            auto *bin = qobject_cast<Bin *>(parentWidget());
+            pCore->projectItemModel()->dropBinSource = bin && bin->dockWidget() ? bin->dockWidget()->objectName() : QString();
         }
     }
     QTreeView::dropEvent(event);
@@ -3720,7 +3722,7 @@ void Bin::slotItemDoubleClicked(const QModelIndex &ix, const QPoint &pos, uint m
     if (m_listType == BinIconView) {
         if (item->childCount() > 0 || item->itemType() == AbstractProjectItem::FolderItem) {
             m_itemView->setRootIndex(ix);
-            parentWidget()->setWindowTitle(item->name());
+            dockWidget()->setWindowTitle(item->name());
             m_upAction->setVisible(true);
             m_upAction->setEnabled(true);
             // If item is a sequence, we still want to trigger the open sequence action
@@ -3731,7 +3733,7 @@ void Bin::slotItemDoubleClicked(const QModelIndex &ix, const QPoint &pos, uint m
             if (!m_isMainBin && item->itemType() == AbstractProjectItem::FolderItem) {
                 // Double click a folder in secondary bin will set it as bin root
                 m_itemView->setRootIndex(ix);
-                parentWidget()->setWindowTitle(item->name());
+                dockWidget()->setWindowTitle(item->name());
                 m_upAction->setVisible(true);
                 m_upAction->setEnabled(true);
                 return;
@@ -5015,7 +5017,7 @@ void Bin::editMasterEffect(const std::shared_ptr<AbstractProjectItem> &clip)
 void Bin::slotGotFocus()
 {
     m_gainedFocus = true;
-    pCore->lastActiveBin = parentWidget()->objectName();
+    pCore->lastActiveBin = dockWidget()->objectName();
 }
 
 void Bin::blockBin(bool block)
@@ -6096,12 +6098,12 @@ void Bin::slotBack()
         QModelIndex parentId = getIndexForId(parentItem->clipId(), parentItem->itemType() == AbstractProjectItem::FolderItem);
         if (parentId.isValid()) {
             m_itemView->setRootIndex(m_proxyModel->mapFromSource(parentId));
-            parentWidget()->setWindowTitle(parentItem->name());
+            dockWidget()->setWindowTitle(parentItem->name());
         }
     } else {
         m_itemView->setRootIndex(QModelIndex());
         m_upAction->setEnabled(false);
-        parentWidget()->setWindowTitle(i18nc("@title:window", "Project Bin"));
+        dockWidget()->setWindowTitle(i18nc("@title:window", "Project Bin"));
     }
 }
 
@@ -6125,13 +6127,8 @@ void Bin::checkProjectAudioTracks(QString clipId, int minimumTracksCount)
             if (m_propertiesPanel) {
                 const QList<ClipPropertiesController *> children = m_propertiesPanel->findChildren<ClipPropertiesController *>();
                 for (ClipPropertiesController *w : children) {
-                    if (w->parentWidget() && w->parentWidget()->parentWidget()) {
-                        // Raise panel
-                        auto dock = static_cast<KDDockWidgets::QtWidgets::DockWidget *>(w->parentWidget()->parentWidget());
-                        if (dock) {
-                            dock->open();
-                            dock->setAsCurrentTab();
-                        }
+                    if (auto *action = pCore->window()->actionCollection()->action(QStringLiteral("raise_clip_properties"))) {
+                        action->trigger();
                     }
                     // Show audio tab
                     w->activatePage(2);
@@ -7094,7 +7091,7 @@ const QString Bin::rootFolderId() const
 
 const QString Bin::binInfoToString() const
 {
-    KDDockWidgets::QtWidgets::DockWidget *dock = qobject_cast<KDDockWidgets::QtWidgets::DockWidget *>(parentWidget());
+    KDDockWidgets::QtWidgets::DockWidget *dock = qobject_cast<KDDockWidgets::QtWidgets::DockWidget *>(dockWidget());
     QString binInfo;
     if (dock) {
         binInfo = QStringLiteral("%1:%2:%3").arg(dock->objectName(), rootFolderId(), m_listType == BinIconView ? QLatin1String("1") : QLatin1String("0"));
@@ -7135,7 +7132,7 @@ const QString Bin::loadInfo(const QStringList binInfo, const QStringList existin
             folderName = binName;
         }
     }
-    KDDockWidgets::QtWidgets::DockWidget *dock = qobject_cast<KDDockWidgets::QtWidgets::DockWidget *>(parentWidget());
+    KDDockWidgets::QtWidgets::DockWidget *dock = qobject_cast<KDDockWidgets::QtWidgets::DockWidget *>(dockWidget());
     if (dock) {
         dock->setWindowTitle(folderName);
     }
@@ -7196,7 +7193,7 @@ bool Bin::performDrag(const QModelIndexList indexes)
         return false;
     }
     auto *drag = new QDrag(this);
-    mData->setData(QStringLiteral("text/binId"), parentWidget()->objectName().toLatin1());
+    mData->setData(QStringLiteral("text/binId"), dockWidget()->objectName().toLatin1());
     drag->setMimeData(mData);
     QModelIndex ix = mapped.constFirst();
     QIcon icon = ix.data(AbstractProjectItem::DataThumbnail).value<QIcon>();

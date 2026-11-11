@@ -23,3 +23,8 @@ compile_commands.json
 
 # Artefacts from running KDE CI locally
 kde-ci-reports/*
+
+# KdenCut docker runtime data
+kdencut-docker/config/
+kdencut-docker/media/
+kdencut-docker/.env

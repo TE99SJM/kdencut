@@ -1504,8 +1504,7 @@ void ProjectManager::prepareSave()
     pCore->projectItemModel()->saveProperty(QStringLiteral("kdenlive:documentnotesversion"), QStringLiteral("2"));
     pCore->projectItemModel()->saveProperty(QStringLiteral("kdenlive:docproperties.opensequences"), pCore->window()->openedSequences().join(QLatin1Char(';')));
     pCore->projectItemModel()->saveProperty(QStringLiteral("kdenlive:docproperties.activetimeline"), m_activeTimelineModel->uuid().toString());
-    KDDockWidgets::LayoutSaver dockLayout(KDDockWidgets::RestoreOption_AbsoluteFloatingDockWindows);
-    pCore->projectItemModel()->saveProperty(QStringLiteral("kdenlive:docproperties.layout"), QString(dockLayout.serializeLayout()));
+    pCore->projectItemModel()->saveProperty(QStringLiteral("kdenlive:docproperties.layout"), QString(pCore->window()->layoutForSaving()));
 }
 
 void ProjectManager::slotResetProfiles(bool reloadThumbs)

@@ -6,6 +6,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 
 #pragma once
 
+#include <QByteArray>
 #include <QComboBox>
 #ifndef NODBUS
 #include <QDBusAbstractAdaptor>
@@ -57,6 +58,7 @@ class ScopeManager;
 class TimelineTabs;
 class TimelineWidget;
 class TimelineContainer;
+namespace KdenCut { class MobileWorkspace; }
 class Transition;
 class TimelineItemModel;
 class MonitorProxy;
@@ -118,6 +120,9 @@ public:
                        const QString &category);
 
     void processRestoreState(const QByteArray &state);
+    /** @brief Persist the desktop workspace, not a temporary phone layout. */
+    QByteArray layoutForSaving() const;
+    bool isMobileWorkspace() const { return m_touchCompactLayout; }
 
     /**
      * @brief Adds a new dock widget to this window.
@@ -264,6 +269,22 @@ private:
     OtioImport *m_otioImport{nullptr};
     KColorSchemeManager *m_colorschemes;
     ScopeManager *m_scopesManager{nullptr};
+    void updateTouchLayout();
+    void leaveTouchLayout();
+    void showTouchPanel(KDDockWidgets::QtWidgets::DockWidget *dock);
+    void closeTouchPanel();
+    void touchCommand(const QString &name);
+    void importTouchMedia(bool audio, bool title = false, bool overlay = false);
+    QByteArray m_touchWideLayout;
+    bool m_touchCompactLayout{false};
+    bool m_touchMovingWidgets{false};
+    QMetaObject::Connection m_monitorDockVisibilityConnection;
+    Qt::WindowStates m_touchWindowState;
+    QList<QPointer<QWidget>> m_touchHiddenWidgets;
+    KdenCut::MobileWorkspace *m_mobileWorkspace{nullptr};
+    QWidget *m_touchMonitorPlaceholder{nullptr};
+    KDDockWidgets::QtWidgets::DockWidget *m_touchPanelDock{nullptr};
+    QWidget *m_touchPanelPlaceholder{nullptr};
     KDDockWidgets::QtWidgets::MainWindow *mainDockWindow;
     KDDockWidgets::QtWidgets::DockWidget *m_timelineDock{nullptr};
     KDDockWidgets::QtWidgets::DockWidget *m_projectBinDock{nullptr};

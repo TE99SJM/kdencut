@@ -1,0 +1,47 @@
+#kdencut-media-dialog { color-scheme: dark; color: #f0f0f0; background: #17191c; border: 1px solid #373b42; border-radius: 18px; padding: 16px; box-sizing: border-box; width: min(520px, calc(100vw - 16px)); max-width: calc(100vw - 16px); height: min(900px, calc(100dvh - 16px)); max-height: calc(100dvh - 16px); margin: auto; overflow: hidden; font: 15px/1.45 system-ui, sans-serif; }
+#kdencut-media-dialog[open] { display: flex; flex-direction: column; }
+#kdencut-media-dialog > section { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+#kdencut-media-dialog::backdrop { background: #000b; }
+#kdencut-media-dialog [hidden] { display: none !important; }
+#kdencut-media-dialog header, #kdencut-media-dialog nav { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-shrink: 0; }
+#kdencut-media-dialog header { justify-content: space-between; }
+#kdencut-media-dialog h2 { margin: 0; font-size: 22px; }
+#kdencut-media-dialog button, #kdencut-media-dialog select { font: inherit; color: inherit; border: 1px solid #42464d; border-radius: 9px; background: #282c31; padding: 10px 12px; min-height: 44px; cursor: pointer; }
+#kdencut-media-dialog button:disabled, #kdencut-media-dialog input:disabled { opacity: .5; cursor: default; }
+#kdencut-media-dialog nav button { flex: 1; min-width: 0; padding: 10px 6px; }
+#kdencut-media-dialog nav button[aria-pressed="true"] { border-color: #04c7d6; color: #5aebf2; }
+#kdencut-media-dialog .kdencut-picker { position: relative; display: block; padding: 20px; margin: 12px 0; border-radius: 12px; background: #08bfd0; color: #081719; font-weight: 650; text-align: center; cursor: pointer; }
+#kdencut-media-dialog .kdencut-picker.secondary { background: #2c3037; color: #eee; }
+#kdencut-media-dialog .kdencut-picker input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+#kdencut-media-dialog .kdencut-picker:focus-within { outline: 2px solid white; outline-offset: 2px; }
+#kdencut-media-dialog .kdencut-primary { background: #08bfd0; color: #071719; border-color: transparent; margin-top: 12px; }
+#kdencut-media-dialog .kdencut-muted { color: #b3bac4; font-size: 13px; }
+#kdencut-media-dialog .kdencut-error { color: #ffb1a6; }
+#kdencut-media-dialog .kdencut-source-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+#kdencut-media-dialog .kdencut-source-row select { box-sizing: border-box; width: 100%; min-width: 0; font-size: 16px; }
+#kdencut-media-dialog .kdencut-source-actions { display: flex; gap: 8px; }
+#kdencut-media-dialog .kdencut-source-actions button { flex: 1; }
+#kdencut-media-dialog .kdencut-breadcrumbs { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 10px; }
+#kdencut-media-dialog .kdencut-breadcrumbs span { overflow-wrap: anywhere; max-width: 100%; color: #b3bac4; }
+#kdencut-media-dialog .kdencut-file-list { border-top: 1px solid #3a3d44; }
+#kdencut-media-dialog .kdencut-directory { display: block; width: 100%; text-align: left; margin-top: 5px; overflow-wrap: anywhere; }
+#kdencut-media-dialog .kdencut-file { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 0; border-bottom: 1px solid #30343a; }
+#kdencut-media-dialog .kdencut-file input { width: 22px; height: 22px; accent-color: #08bfd0; flex-shrink: 0; }
+#kdencut-media-dialog .kdencut-file-details { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; overflow-wrap: anywhere; }
+#kdencut-media-dialog .kdencut-file small { color: #a7afb9; white-space: nowrap; }
+#kdencut-media-dialog .kdencut-selection-bar { position: sticky; bottom: 0; padding: 8px 0; background: #17191c; }
+#kdencut-media-dialog .kdencut-selection-bar button { display: block; width: 100%; margin: 0; }
+#kdencut-media-dialog form > button { display: block; width: 100%; margin-top: 8px; }
+#kdencut-media-dialog .kdencut-field { display: block; margin: 12px 0; }
+#kdencut-media-dialog .kdencut-field input { display: block; box-sizing: border-box; width: 100%; font: 16px system-ui; padding: 12px; margin-top: 5px; color: #eee; background: #24282d; border: 1px solid #454951; border-radius: 8px; }
+#kdencut-media-dialog footer { margin-top: 8px; flex-shrink: 0; }
+#kdencut-media-dialog footer button { width: 100%; }
+#kdencut-media-dialog footer p { overflow-wrap: anywhere; }
+#kdencut-media-dialog footer p:empty { display: none; }
+#kdencut-media-dialog progress { display: block; width: 100%; height: 10px; accent-color: #08bfd0; margin: 12px 0; }
+@media (max-height: 420px) {
+  #kdencut-media-dialog { padding: 8px 12px; }
+  #kdencut-media-dialog header, #kdencut-media-dialog nav { margin-bottom: 4px; }
+  #kdencut-media-dialog footer { margin-top: 4px; }
+  #kdencut-media-dialog footer p { margin: 4px 0; }
+}

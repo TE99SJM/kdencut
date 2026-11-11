@@ -51,6 +51,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QCursor>
+#include "kdencut/touchmode.h"
 #include <QDir>
 #include <QIcon>
 #include <QJsonArray>
@@ -287,7 +288,7 @@ int main(int argc, char *argv[])
     QString otherText = i18n("Please report bugs to <a href=\"%1\">%2</a>", QStringLiteral("https://bugs.kde.org/enter_bug.cgi?product=kdenlive"),
                              QStringLiteral("https://bugs.kde.org/"));
 
-    KAboutData aboutData(QByteArray("kdenlive"), i18n("Kdenlive"), KDENLIVE_VERSION, i18n("An open source video editor."), KAboutLicense::GPL_V3,
+    KAboutData aboutData(QByteArray("kdenlive"), i18n("KdenCut"), KDENLIVE_VERSION, i18n("A touch-friendly video editor based on Kdenlive."), KAboutLicense::GPL_V3,
                          i18n("Copyright © 2007–2025 Kdenlive authors"), otherText, QStringLiteral("https://kdenlive.org"));
     // main developers (alphabetical)
     aboutData.addAuthor(i18n("Jean-Baptiste Mardelle"), i18n("Core team member, main developer and maintainer, MLT, and KDE SC 4 / KF5 port"), QStringLiteral("jb@kdenlive.org"));
@@ -378,11 +379,11 @@ int main(int argc, char *argv[])
     // Parse command line
     parser.process(app);
 
-    // KdenCut starts without a pointer for touch and remote touch sessions.
-    // An application override also covers child widgets and QML windows.
-    if (!parser.isSet(showCursorOption)) {
-        QApplication::setOverrideCursor(QCursor(Qt::BlankCursor));
-    }
+    // KdenCut: CapCut-style look, touch input and hidden pointer.
+    // The cursor override covers child widgets and QML windows. Use --show-cursor
+    // or View > Show Mouse Cursor to get it back.
+    KdenCut::TouchMode::instance()->initialize(parser.isSet(showCursorOption));
+    KdenCut::TouchMode::instance()->applyLookIfNeeded();
     aboutData.processCommandLine(&parser);
 
     if (parser.isSet(saveDebugOption)) {

@@ -1,0 +1,419 @@
+/*
+    KdenCut touch stylesheet
+    CapCut-style dark surfaces, rounded controls and finger-sized hit areas.
+    Colors come from the KdenCut color scheme through palette() where possible,
+    so switching color scheme from Settings still works.
+    SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+*/
+
+QMainWindow::separator {
+    background: #0e0e10;
+    width: 6px;
+    height: 6px;
+}
+
+/* ---------- Toolbars ---------- */
+QToolBar {
+    background: palette(window);
+    border: none;
+    spacing: 6px;
+    padding: 4px 6px;
+}
+
+QToolBar::separator {
+    background: #2c2c31;
+    width: 1px;
+    height: 1px;
+    margin: 8px 6px;
+}
+
+QToolButton {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 4px 8px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+}
+
+QToolButton:hover {
+    background: #2a2a30;
+}
+
+QToolButton:pressed,
+QToolButton:checked {
+    background: rgba(0, 193, 205, 0.20);
+    border: 1px solid rgba(0, 193, 205, 0.55);
+    color: #ffffff;
+}
+
+QToolButton:disabled {
+    color: #5c5c64;
+}
+
+QToolButton[popupMode="1"] {
+    padding-right: 22px;
+}
+
+QToolButton::menu-button {
+    width: 20px;
+    border: none;
+    border-top-right-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+/* ---------- Push buttons ---------- */
+QPushButton {
+    min-height: 40px;
+    min-width: 72px;
+    padding: 6px 18px;
+    border-radius: 10px;
+    border: 1px solid #34343a;
+    background: #26262b;
+    color: palette(button-text);
+}
+
+QPushButton:hover {
+    background: #2f2f35;
+    border-color: #44444c;
+}
+
+QPushButton:pressed {
+    background: #1c1c20;
+}
+
+QPushButton:default {
+    background: #00c1cd;
+    border-color: #00c1cd;
+    color: #071012;
+    font-weight: bold;
+}
+
+QPushButton:default:hover {
+    background: #22d3de;
+}
+
+QPushButton:default:pressed {
+    background: #00a3ad;
+}
+
+QPushButton:disabled {
+    color: #5c5c64;
+    background: #1d1d21;
+    border-color: #26262b;
+}
+
+/* ---------- Tabs (CapCut asset bar look) ---------- */
+QTabBar::tab {
+    min-height: 40px;
+    min-width: 64px;
+    padding: 6px 16px;
+    margin: 2px 2px 0px 2px;
+    border: none;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    color: #9a9aa2;
+}
+
+QTabBar::tab:hover {
+    color: #e8e8ea;
+}
+
+QTabBar::tab:selected {
+    color: #ffffff;
+    border-bottom: 3px solid #00c1cd;
+}
+
+QTabWidget::pane {
+    border: none;
+    border-top: 1px solid #26262b;
+}
+
+/* ---------- Text inputs, spin boxes, combo boxes ---------- */
+QLineEdit,
+QAbstractSpinBox,
+QComboBox {
+    min-height: 36px;
+    padding: 2px 10px;
+    border-radius: 8px;
+    border: 1px solid #34343a;
+    background: #141416;
+    selection-background-color: #00838c;
+}
+
+QLineEdit:focus,
+QAbstractSpinBox:focus,
+QComboBox:focus {
+    border: 1px solid #00c1cd;
+}
+
+QComboBox::drop-down {
+    width: 32px;
+    border: none;
+}
+
+/* Timecode fields compute their own width, keep padding minimal */
+TimecodeDisplay {
+    padding: 0px 2px;
+    min-width: 120px;
+}
+
+QAbstractSpinBox::up-button,
+QAbstractSpinBox::down-button {
+    width: 28px;
+}
+
+QComboBox QAbstractItemView {
+    background: #1e1e22;
+    border: 1px solid #34343a;
+    border-radius: 8px;
+    selection-background-color: #00838c;
+    outline: none;
+}
+
+/* ---------- Lists and trees (media bin, effects, settings) ---------- */
+QAbstractItemView {
+    outline: none;
+    selection-background-color: rgba(0, 193, 205, 0.28);
+    selection-color: #ffffff;
+}
+
+QTreeView::item,
+QListView::item {
+    min-height: 36px;
+    padding: 2px 4px;
+}
+
+QTreeView::item:selected,
+QListView::item:selected {
+    background: rgba(0, 193, 205, 0.28);
+    color: #ffffff;
+}
+
+QHeaderView::section {
+    min-height: 32px;
+    padding: 0px 8px;
+    border: none;
+    border-right: 1px solid #26262b;
+    background: #18181b;
+    color: #9a9aa2;
+}
+
+/* ---------- Check boxes and radio buttons ---------- */
+QCheckBox,
+QRadioButton {
+    min-height: 36px;
+    spacing: 10px;
+}
+
+QCheckBox::indicator,
+QRadioButton::indicator,
+QGroupBox::indicator {
+    width: 22px;
+    height: 22px;
+}
+
+/* ---------- Sliders ---------- */
+QSlider {
+    min-height: 36px;
+}
+
+QSlider::groove:horizontal {
+    height: 6px;
+    border-radius: 3px;
+    background: #34343a;
+}
+
+QSlider::sub-page:horizontal {
+    height: 6px;
+    border-radius: 3px;
+    background: #00c1cd;
+}
+
+QSlider::handle:horizontal {
+    width: 24px;
+    height: 24px;
+    margin: -9px 0px;
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+QSlider::groove:vertical {
+    width: 6px;
+    border-radius: 3px;
+    background: #34343a;
+}
+
+QSlider::add-page:vertical {
+    width: 6px;
+    border-radius: 3px;
+    background: #00c1cd;
+}
+
+QSlider::handle:vertical {
+    width: 24px;
+    height: 24px;
+    margin: 0px -9px;
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+/* ---------- Scroll bars: wide enough for a finger ---------- */
+QScrollBar:vertical {
+    width: 16px;
+    margin: 0px;
+    border: none;
+    background: transparent;
+}
+
+QScrollBar:horizontal {
+    height: 16px;
+    margin: 0px;
+    border: none;
+    background: transparent;
+}
+
+QScrollBar::handle:vertical {
+    min-height: 48px;
+    margin: 3px;
+    border-radius: 5px;
+    background: #3a3a41;
+}
+
+QScrollBar::handle:horizontal {
+    min-width: 48px;
+    margin: 3px;
+    border-radius: 5px;
+    background: #3a3a41;
+}
+
+QScrollBar::handle:hover,
+QScrollBar::handle:pressed {
+    background: #00c1cd;
+}
+
+QScrollBar::add-line,
+QScrollBar::sub-line {
+    width: 0px;
+    height: 0px;
+    border: none;
+    background: none;
+}
+
+QScrollBar::add-page,
+QScrollBar::sub-page {
+    background: none;
+}
+
+/* ---------- Menus: tall rows for fingers ---------- */
+QMenuBar {
+    background: palette(window);
+    padding: 2px;
+}
+
+QMenuBar::item {
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: transparent;
+}
+
+QMenuBar::item:selected,
+QMenuBar::item:pressed {
+    background: #2a2a30;
+}
+
+QMenu {
+    padding: 6px;
+    border: 1px solid #2c2c31;
+    border-radius: 10px;
+    background: #1e1e22;
+}
+
+QMenu::item {
+    min-height: 26px;
+    padding: 9px 30px 9px 30px;
+    border-radius: 8px;
+}
+
+QMenu::item:selected {
+    background: rgba(0, 193, 205, 0.25);
+    color: #ffffff;
+}
+
+QMenu::separator {
+    height: 1px;
+    margin: 6px 10px;
+    background: #2c2c31;
+}
+
+QMenu::icon {
+    padding-left: 10px;
+}
+
+/* ---------- Group boxes and frames ---------- */
+QGroupBox {
+    margin-top: 18px;
+    padding-top: 8px;
+    border: 1px solid #26262b;
+    border-radius: 10px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 12px;
+    padding: 0px 4px;
+    color: #9a9aa2;
+}
+
+QToolTip {
+    padding: 8px 10px;
+    border: 1px solid #34343a;
+    border-radius: 8px;
+    background: #2c2c32;
+    color: #e8e8ea;
+}
+
+QStatusBar {
+    min-height: 32px;
+    background: #121214;
+}
+
+/* ---------- Monitor play button (CapCut style round button) ---------- */
+QToolButton#kdencutPlayButton {
+    min-width: 52px;
+    min-height: 48px;
+    padding: 2px 26px 2px 10px;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.10);
+    qproperty-iconSize: 30px;
+}
+
+QToolButton#kdencutPlayButton:hover {
+    background: rgba(0, 193, 205, 0.30);
+}
+
+QToolButton#kdencutPlayButton::menu-button {
+    width: 22px;
+    border-top-right-radius: 24px;
+    border-bottom-right-radius: 24px;
+}
+
+/* ---------- Status bar toggles stay compact ---------- */
+QStatusBar QToolButton {
+    min-width: 0px;
+    min-height: 0px;
+    padding: 1px 4px;
+    border-radius: 6px;
+}
+
+QStatusBar QToolButton:checked {
+    background: rgba(0, 193, 205, 0.16);
+    border: 1px solid transparent;
+    color: #00c1cd;
+}
+
+QStatusBar QPushButton {
+    min-width: 0px;
+    min-height: 0px;
+    padding: 2px 8px;
+}
