@@ -104,11 +104,14 @@ private Q_SLOTS:
         for (int x = 340; x >= 90; x -= 10) {
             const QPoint pos = strip->viewport()->mapTo(&workspace, QPoint(x, 30));
             QTest::mouseMove(workspace.windowHandle(), pos, 15);
+            // QTest's delay advances event timestamps, not the wall clock.
+            // QScroller's gesture recognizer uses a monotonic clock, so allow
+            // actual animation frames instead of injecting a zero-time flick.
+            QTest::qWait(16);
         }
         const QPoint end = strip->viewport()->mapTo(&workspace, QPoint(90, 30));
         QTest::mouseRelease(workspace.windowHandle(), Qt::LeftButton, Qt::NoModifier, end);
-        QTest::qWait(100);
-        QVERIFY(strip->horizontalScrollBar()->value() > 50);
+        QTRY_VERIFY_WITH_TIMEOUT(strip->horizontalScrollBar()->value() > 50, 2000);
         QVERIFY(commands.isEmpty());
     }
 
