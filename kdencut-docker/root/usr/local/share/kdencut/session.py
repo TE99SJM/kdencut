@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import sys
 from hardware import detect, environment
+from speech import prepare_models
 
 
 def main():
@@ -14,6 +15,8 @@ def main():
     temporary.write_text(json.dumps(hardware))
     temporary.replace(folder/'hardware.json')
     os.environ.update(environment(hardware))
+    models = prepare_models(Path(os.environ.get('XDG_CACHE_HOME', '/config/.cache')))
+    os.environ['KDENCUT_WHISPER_MODELS'] = str(models)
     print('KdenCut processing: '+hardware['backend'], flush=True)
     os.execvp('kdenlive', ['kdenlive', *sys.argv[1:]])
 

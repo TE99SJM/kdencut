@@ -1,0 +1,26 @@
+"""Run inside the production image: require real MLT services and offline STT."""
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+import wave
+
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+for kind, service in [('filter','vidstab'), ('filter','rnnoise'), ('filter','opencv.tracker'), ('producer','glaxnimate')]:
+    result = subprocess.run(['melt','-query',f'{kind}={service}'], capture_output=True, text=True, check=True)
+    assert f'identifier: {service}' in result.stdout + result.stderr, result.stdout + result.stderr
+
+with tempfile.TemporaryDirectory() as root:
+    source = Path(root)/'silence.wav'
+    with wave.open(str(source), 'wb') as audio:
+        audio.setnchannels(1); audio.setsampwidth(2); audio.setframerate(16000)
+        audio.writeframes(b'\0' * 32000)
+    # Run the same SRT script used by the native Captions action with the bundled
+    # model. Silence should produce a valid empty SRT, without downloading.
+    env = dict(os.environ, XDG_CACHE_HOME=root, OMP_NUM_THREADS='2', NUMBA_NUM_THREADS='2')
+    models = Path(root)/'whisper'; models.mkdir()
+    (models/'tiny.pt').symlink_to('/opt/kdencut-models/tiny.pt')
+    script = '/usr/share/kdenlive/scripts/whisper/whispertosrt.py'
+    subprocess.run(['/opt/kdencut-speech/bin/python3', script, str(source), 'tiny', 'device=cpu', 'fp16=False', 'language=en'], env=env, check=True, timeout=180)
+    assert source.with_suffix('.srt').exists(), 'Whisper did not write an SRT'
+print('Stabilization, noise reduction, tracking, Lottie and offline captions passed')

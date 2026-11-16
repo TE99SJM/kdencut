@@ -26,7 +26,7 @@
   // Keep a real file input in the tapped label: iOS needs a user gesture.
   const photoInput = el('input', '', photos, {type: 'file', accept: 'image/*,video/*', multiple: '', 'aria-label': 'Choose photos and videos'});
   const files = el('label', 'Browse Files', device, {class: 'kdencut-picker secondary'});
-  const fileInput = el('input', '', files, {type: 'file', accept: 'video/*,image/*,audio/*,.mkv,.mts,.m2ts,.mxf,.heic,.heif,.mov', multiple: '', 'aria-label': 'Browse device files'});
+  const fileInput = el('input', '', files, {type: 'file', accept: 'video/*,image/*,audio/*,.mkv,.mts,.m2ts,.mxf,.heic,.heif,.mov,.json,.lottie,.rawr,.tgs,.lot', multiple: '', 'aria-label': 'Browse device files'});
   const storage = el('section', '', content, {hidden: '', class: 'kdencut-storage'});
   const sourceRow = el('div', '', storage, {class: 'kdencut-source-row'});
   el('label', 'Storage location', sourceRow, {for: 'kdencut-storage-location', class: 'kdencut-muted'});

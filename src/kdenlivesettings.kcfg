@@ -1478,6 +1478,10 @@
       <label>Version of the KdenCut look that was last applied.</label>
       <default>0</default>
     </entry>
+    <entry name="kdencutspeechversion" type="Int">
+      <label>Version of the bundled KdenCut speech setup applied once.</label>
+      <default>0</default>
+    </entry>
     <entry name="force_breeze" type="Bool">
       <label>Force breeze icon theme for consistent look.</label>
       <default>false</default>

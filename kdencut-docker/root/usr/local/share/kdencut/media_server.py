@@ -17,7 +17,7 @@ import time
 import uuid
 from import_cleanup import ImportCleanup
 
-MEDIA_EXTENSIONS = set("mp4 mov m4v mkv avi webm mpg mpeg mts m2ts ts mxf vob ogv 3gp mp3 wav flac aac m4a ogg opus aiff aif wma jpg jpeg png webp gif bmp tif tiff heic heif avif svg".split())
+MEDIA_EXTENSIONS = set("mp4 mov m4v mkv avi webm mpg mpeg mts m2ts ts mxf vob ogv 3gp mp3 wav flac aac m4a ogg opus aiff aif wma jpg jpeg png webp gif bmp tif tiff heic heif avif svg json lottie rawr tgs lot".split())
 MAX_FILE = 100 * 1024**3
 CHUNK_SIZE = 1024**2
 

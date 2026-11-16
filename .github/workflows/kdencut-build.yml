@@ -39,6 +39,8 @@ jobs:
           '
       - name: Check packaged media service and editor login
         run: python3 kdencut-docker/tests/test_media_container.py
+      - name: Check packaged effects and offline Whisper captions
+        run: docker run --rm --entrypoint python3 -v "$PWD:/src:ro" kdencut-ci /src/kdencut-docker/tests/check_packaged_features.py
   media:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -52,6 +54,7 @@ jobs:
           python3 -m unittest discover -s kdencut-docker/tests -p test_resumable_uploads.py -v
           python3 -m unittest discover -s kdencut-docker/tests -p test_import_cleanup.py -v
           python3 -m unittest discover -s kdencut-docker/tests -p test_gpu.py -v
+          python3 -m unittest discover -s kdencut-docker/tests -p test_speech_setup.py -v
       - name: Install media integration test dependencies
         run: |
           python3 -m venv /tmp/media-tests

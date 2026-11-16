@@ -4759,7 +4759,7 @@ void MainWindow::touchCommand(const QString &name)
         showTouchPanel(m_compositionListDock);
     } else if (name == QLatin1String("captions")) {
         closeTouchPanel();
-        actionCollection()->action(QStringLiteral("add_subtitle"))->trigger();
+        if (getCurrentTimeline()) slotSpeechRecognition();
     } else if (name == QLatin1String("new")) {
         pCore->projectManager()->newFile(false);
         if (m_mobileWorkspace) {
