@@ -75,6 +75,18 @@ class ResumableTests(unittest.TestCase):
         self.store.status()
         self.assertEqual(path.read_bytes(), b'video')
 
+    def test_browsing_completed_pending_upload_keeps_selected_file(self):
+        token = self.begin(5)['token']
+        self.chunk(token, 0, b'video')
+        path = Path(self.store.files[token]['path'])
+        self.store.roots['imports'] = self.store.imports
+        # A failed later file can leave completed files visible in Imported media.
+        self.store.select(self.id, 'imports', [str(path.relative_to(self.store.imports))])
+        (self.root/'bridge/request.json').unlink()
+        self.store.status()
+        self.assertEqual(path.read_bytes(), b'video')
+        self.assertEqual(self.store.uploads, {})
+
     def test_cancel_and_native_close_remove_partial_chunks(self):
         token = self.begin()['token']
         self.chunk(token, 0, b'first')

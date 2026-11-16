@@ -341,14 +341,20 @@ class MediaStore:
             if any(item["request"] != request_id for item in files):
                 raise ValueError("Files belong to another import")
             paths = [item["path"] for item in files]
+            self.publish_paths(request_id, paths)
+
+    def publish_paths(self, request_id, paths):
+        with self.lock:
+            self.active(request_id)
+            selected = {Path(path).resolve() for path in paths}
             for token, item in list(self.files.items()):
                 if item["request"] == request_id:
-                    if token not in tokens:
+                    if Path(item["path"]).resolve() not in selected:
                         shutil.rmtree(Path(item["path"]).parent, ignore_errors=True)
                     del self.files[token]
             for token, item in list(self.uploads.items()):
                 if item["request"] == request_id:
-                    self.discard_upload(token, keep=token in tokens)
+                    self.discard_upload(token, keep=Path(item["path"]).resolve() in selected)
             # Publish only after persisted cancellation/cleanup ownership is gone.
             # Once native code consumes this response it may remove the bridge
             # request immediately; a service restart must not delete its media.
@@ -377,8 +383,7 @@ class MediaStore:
                 media_name(file.name)
                 if not file.is_file():
                     raise ValueError("Choose files, not folders")
-            self.active(request_id)
-            atomic_json(self.bridge / (request_id + ".json"), {"id": request_id, "status": "ready", "paths": [str(p) for p in files]})
+            self.publish_paths(request_id, [str(p) for p in files])
             return
         with self.lock:
             if self.jobs.get(request_id, {}).get("state") == "copying":
