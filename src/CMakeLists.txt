@@ -86,6 +86,7 @@ list(APPEND kdenlive_SRCS
     kdencut/mediaimportbridge.cpp
     kdencut/mediaprojectusage.cpp
     kdencut/runtimefeatures.cpp
+    kdencut/mainwindowtouch.cpp
     kdencut/mobileediting.cpp
     kdencut/mobileexport.cpp
 )
