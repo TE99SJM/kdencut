@@ -336,11 +336,11 @@ class MediaStore:
         if not isinstance(tokens, list) or not tokens or len(tokens) > 500:
             raise ValueError("Select at least one media file")
         with self.lock:
+            self.active(request_id)
             files = [self.files[token] for token in tokens]
             if any(item["request"] != request_id for item in files):
                 raise ValueError("Files belong to another import")
             paths = [item["path"] for item in files]
-            atomic_json(self.bridge / (request_id + ".json"), {"id": request_id, "status": "ready", "paths": paths})
             for token, item in list(self.files.items()):
                 if item["request"] == request_id:
                     if token not in tokens:
@@ -349,11 +349,15 @@ class MediaStore:
             for token, item in list(self.uploads.items()):
                 if item["request"] == request_id:
                     self.discard_upload(token, keep=token in tokens)
+            # Publish only after persisted cancellation/cleanup ownership is gone.
+            # Once native code consumes this response it may remove the bridge
+            # request immediately; a service restart must not delete its media.
+            atomic_json(self.bridge / (request_id + ".json"), {"id": request_id, "status": "ready", "paths": paths})
 
     def cancel(self, request_id, status="cancelled"):
-        self.active(request_id)
-        atomic_json(self.bridge / (request_id + ".json"), {"id": request_id, "status": status})
         with self.lock:
+            self.active(request_id)
+            atomic_json(self.bridge / (request_id + ".json"), {"id": request_id, "status": status})
             for token, item in list(self.uploads.items()):
                 if item["request"] == request_id:
                     self.discard_upload(token)

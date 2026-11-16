@@ -3,6 +3,7 @@ import io
 import json
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 import test_media_server as common
 media = common.media
 
@@ -53,6 +54,26 @@ class ResumableTests(unittest.TestCase):
         self.assertTrue(self.begin(5)['complete'])
         self.store.finish(self.id, [token])
         self.assertTrue((self.root/f'bridge/{self.id}.json').exists())
+
+    def test_crash_after_native_handoff_cannot_delete_imported_media(self):
+        token = self.begin(5)['token']
+        self.chunk(token, 0, b'video')
+        path = Path(self.store.files[token]['path'])
+        atomic_json = media.atomic_json
+        def crash_after_publish(destination, data):
+            atomic_json(destination, data)
+            if Path(destination).name == self.id + '.json':
+                # The native editor has consumed the ready message, then the
+                # service dies before returning the HTTP response.
+                Path(destination).unlink()
+                (self.root/'bridge/request.json').unlink()
+                raise RuntimeError('simulated process exit after handoff')
+        with patch.object(media, 'atomic_json', side_effect=crash_after_publish):
+            with self.assertRaisesRegex(RuntimeError, 'simulated process exit'):
+                self.store.finish(self.id, [token])
+        self.store = media.MediaStore(self.root/'bridge', self.root/'imports', {'media':self.folder})
+        self.store.status()
+        self.assertEqual(path.read_bytes(), b'video')
 
     def test_cancel_and_native_close_remove_partial_chunks(self):
         token = self.begin()['token']
