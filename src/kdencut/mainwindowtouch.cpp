@@ -412,4 +412,3 @@ void MainWindow::touchCommand(const QString &name)
         m_mobileWorkspace->showEditor();
     }
 }
-
