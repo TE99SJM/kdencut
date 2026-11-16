@@ -115,7 +115,7 @@
     if (xhr) xhr.abort();
     if (!id) return hide();
     try { await api(mode, {request: id}); hide(); }
-    catch (error) { message(error.message, true); }
+    catch (error) { lock(false); message(error.message, true); }
   }
   close.onclick = () => cancel();
   panel.addEventListener('cancel', event => {event.preventDefault(); cancel();});

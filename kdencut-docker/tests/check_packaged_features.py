@@ -1,5 +1,8 @@
 """Run inside the production image: require real MLT services and offline STT."""
 import os
+import json
+import shlex
+import xml.etree.ElementTree as ET
 from pathlib import Path
 import subprocess
 import tempfile
@@ -24,3 +27,17 @@ with tempfile.TemporaryDirectory() as root:
     subprocess.run(['/opt/kdencut-speech/bin/python3', script, str(source), 'tiny', 'device=cpu', 'fp16=False', 'language=en'], env=env, check=True, timeout=180)
     assert source.with_suffix('.srt').exists(), 'Whisper did not write an SRT'
 print('Stabilization, noise reduction, tracking, Lottie and offline captions passed')
+
+# Render the installed social presets through MLT, not only an XML/name check.
+profiles = ET.parse('/src/data/profiles.xml')
+with tempfile.TemporaryDirectory() as root:
+    for platform in ('TikTok', 'Reels', 'Shorts'):
+        preset = next(p for p in profiles.iter('profile') if p.get('name') == f'KdenCut {platform} (software)')
+        destination = Path(root)/f'{platform}.mp4'
+        subprocess.run(['melt', 'color:red', 'out=2', '-consumer', 'avformat:'+str(destination),
+                        *shlex.split(preset.get('args')), 'real_time=-1'], check=True, timeout=90,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        info = json.loads(subprocess.check_output(['ffprobe', '-v', 'error', '-show_streams', '-of', 'json', str(destination)]))
+        video = next(s for s in info['streams'] if s['codec_type'] == 'video')
+        assert (video['codec_name'], video['width'], video['height']) == ('h264', 1080, 1920), video
+print('All three social presets rendered portrait H.264 through MLT')

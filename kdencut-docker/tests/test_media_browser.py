@@ -110,6 +110,21 @@ class BrowserMediaTests(unittest.TestCase):
         self.assertEqual(offsets, [0, media.CHUNK_SIZE, media.CHUNK_SIZE * 2])
         self.assertEqual(self.errors, [])
 
+    def test_failed_cancel_leaves_chooser_usable(self):
+        self.page.route('**/upload-chunk?*', lambda route: route.abort('connectionreset'))
+        self.page.route('**/kdencut-media/cancel', lambda route: route.abort('connectionreset'))
+        self.page.get_by_role('button', name='This device').click()
+        self.page.get_by_label('Browse device files').set_input_files({'name':'offline.mov', 'mimeType':'video/quicktime', 'buffer':b'video'})
+        self.page.get_by_text('Connection interrupted.', exact=False).wait_for()
+        self.page.get_by_role('button', name='Cancel', exact=True).click()
+        self.page.get_by_role('status').filter(has_text='Failed to fetch').wait_for()
+        self.assertTrue(self.page.get_by_role('button', name='This device').is_enabled())
+        self.assertTrue(self.page.get_by_label('Browse device files').is_enabled())
+        self.page.unroute('**/kdencut-media/cancel')
+        self.page.get_by_role('button', name='Cancel', exact=True).click()
+        self.assertEqual(self.wait_result()['status'], 'cancelled')
+        self.assertEqual(self.errors, [])
+
     def test_storage_warning_and_recoverable_cleanup(self):
         from import_cleanup import ImportCleanup
         original, space = self.store.cleanup, self.store.storage_space
