@@ -15,6 +15,7 @@ import shutil
 import threading
 import time
 import uuid
+from import_cleanup import ImportCleanup
 
 MEDIA_EXTENSIONS = set("mp4 mov m4v mkv avi webm mpg mpeg mts m2ts ts mxf vob ogv 3gp mp3 wav flac aac m4a ogg opus aiff aif wma jpg jpeg png webp gif bmp tif tiff heic heif avif svg".split())
 MAX_FILE = 100 * 1024**3
@@ -60,6 +61,7 @@ class MediaStore:
         self.imports.mkdir(parents=True, exist_ok=True)
         os.chmod(self.bridge, 0o700)
         self.lock = threading.RLock()
+        self.cleanup_lock = threading.Lock()
         self.files = {}
         self.jobs = {}
         self.uploads_file = self.bridge / "upload-sessions.json"
@@ -77,6 +79,28 @@ class MediaStore:
         atomic_json(self.uploads_file, self.uploads)
         self.connections_file = self.bridge / "connections.json"
         self.connections = json.loads(self.connections_file.read_text()) if self.connections_file.exists() else {}
+        project_roots = [Path('/config')] + [path for path in self.roots.values() if path != self.imports.resolve()]
+        self.cleanup = ImportCleanup(self.imports, project_roots, self.live_usage)
+
+    def live_usage(self):
+        with self.cleanup_lock:
+            nonce = uuid.uuid4().hex
+            atomic_json(self.bridge/'usage-request.json', {'nonce':nonce})
+            for _ in range(60):
+                try:
+                    result = json.loads((self.bridge/'live-usage.json').read_text())
+                    if result.get('nonce') == nonce: return result
+                except (OSError, ValueError): pass
+                time.sleep(0.1)
+        raise ValueError('The editor did not respond. Wait until it finishes loading and try cleanup again.')
+
+    def storage_space(self):
+        usage = shutil.disk_usage(self.imports)
+        return {'free':usage.free, 'total':usage.total, 'low':usage.free < max(2*1024**3, usage.total*0.05)}
+
+    def protected_imports(self):
+        with self.lock:
+            return set(self.files) | set(self.uploads)
 
     def request(self):
         try:
@@ -110,7 +134,7 @@ class MediaStore:
             job = dict(self.jobs.get(request["id"], {})) if request else {}
         if request and (self.bridge / (request["id"] + ".json")).exists():
             job["state"] = "done"
-        return {"request": request, "job": job}
+        return {"request": request, "job": job, "space": self.storage_space()}
 
     def sources(self):
         with self.lock:
@@ -205,6 +229,7 @@ class MediaStore:
         token = uuid.uuid4().hex
         folder = self.imports / token
         folder.mkdir(mode=0o700)
+        atomic_json(folder/'.kdencut-import.json', {'name':name, 'created':time.time()})
         return token, folder / name
 
     def discard_upload(self, token, keep=False):
@@ -447,6 +472,10 @@ class Handler(BaseHTTPRequestHandler):
                 result = store.sources()
             elif method == "GET" and parsed.path == "/list":
                 result = {"entries": store.listing(query["source"], query.get("path", ""))}
+            elif method == "GET" and parsed.path == "/cleanup-review":
+                result = store.cleanup.candidates(store.protected_imports())
+            elif method == "GET" and parsed.path == "/cleanup-trash":
+                result = {"files": store.cleanup.trashed()}
             elif method == "PUT" and parsed.path == "/upload":
                 self.connection.settimeout(120)
                 result = {"token": store.receive(query["request"], query["name"], int(self.headers.get("Content-Length", "0")), self.rfile)}
@@ -466,6 +495,11 @@ class Handler(BaseHTTPRequestHandler):
                 elif parsed.path == "/forget":
                     store.forget(body["id"])
                     result = {}
+                elif parsed.path == "/cleanup":
+                    if body.get('confirmed_project_locations') is not True:
+                        raise ValueError('Confirm that all projects using these imports are stored in /config or /media.')
+                    store.cleanup.apply(body['files'], body['action'], store.protected_imports())
+                    result = {'space':store.storage_space()}
                 elif parsed.path == "/finish":
                     store.finish(body["request"], body["files"])
                     result = {}

@@ -84,6 +84,7 @@ list(APPEND kdenlive_SRCS
     kdencut/touchmode.cpp
     kdencut/mobileworkspace.cpp
     kdencut/mediaimportbridge.cpp
+    kdencut/mediaprojectusage.cpp
 )
 
 if(CRASH_AUTO_TEST)

@@ -8,6 +8,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include "kdencut/touchmode.h"
 #include "kdencut/mobileworkspace.h"
 #include "kdencut/mediaimportbridge.h"
+#include "kdencut/mediaprojectusage.h"
 #include "monitor/monitorproxy.h"
 #include "assets/assetpanel.hpp"
 #include "audiomixer/mixermanager.hpp"
@@ -775,6 +776,7 @@ void MainWindow::init()
 
 void MainWindow::finishUiSetup()
 {
+    KdenCut::trackMediaProjectUsage(this);
     pCore->restoreLayout();
     // Watch the screen, rather than the window: a desktop dock layout can impose
     // a window minimum wider than the remote screen after a phone rotates.

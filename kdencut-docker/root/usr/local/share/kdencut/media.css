@@ -32,6 +32,7 @@
 #kdencut-media-dialog .kdencut-selection-bar { position: sticky; bottom: 0; padding: 8px 0; background: #17191c; }
 #kdencut-media-dialog .kdencut-selection-bar button { display: block; width: 100%; margin: 0; }
 #kdencut-media-dialog form > button { display: block; width: 100%; margin-top: 8px; }
+#kdencut-media-dialog .kdencut-cleanup > button { display: block; width: 100%; margin-top: 8px; }
 #kdencut-media-dialog .kdencut-field { display: block; margin: 12px 0; }
 #kdencut-media-dialog .kdencut-field input { display: block; box-sizing: border-box; width: 100%; font: 16px system-ui; padding: 12px; margin-top: 5px; color: #eee; background: #24282d; border: 1px solid #454951; border-radius: 8px; }
 #kdencut-media-dialog footer { margin-top: 8px; flex-shrink: 0; }

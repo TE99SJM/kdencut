@@ -34,6 +34,7 @@
   const sourceActions = el('div', '', sourceRow, {class: 'kdencut-source-actions'});
   const addNas = el('button', '+ NAS', sourceActions, {type: 'button'});
   const forget = el('button', 'Forget', sourceActions, {type: 'button', hidden: ''});
+  const cleanImports = el('button', 'Storage', sourceActions, {type: 'button'});
   const crumbs = el('div', '', storage, {class: 'kdencut-breadcrumbs'});
   const up = el('button', '↑ Parent', crumbs, {type: 'button'});
   const folderLabel = el('span', '/', crumbs);
@@ -55,7 +56,21 @@
   el('p', 'The connection and credentials are saved on this server.', nas, {class: 'kdencut-muted'});
   const nasSave = el('button', 'Connect and save', nas, {type: 'submit', class: 'kdencut-primary'});
   const nasBack = el('button', 'Back', nas, {type: 'button'});
+  const cleanup = el('section', '', content, {hidden: '', class:'kdencut-cleanup'});
+  el('h3', 'Unused imports', cleanup);
+  el('p', 'Checks saved projects and autosaves in /config and /media, plus the open project. Imports less than a day old are protected. Originals on your server and NAS are never removed.', cleanup);
+  const scopeLabel = el('label', '', cleanup, {class:'kdencut-file'});
+  const scope = el('input', '', scopeLabel, {type:'checkbox'});
+  el('span', 'All projects using these imports are stored in /config or /media.', scopeLabel);
+  const review = el('button', 'Review unused imports', cleanup, {type:'button'});
+  const cleanupList = el('div', '', cleanup);
+  const trashSelected = el('button', 'Move selected to trash', cleanup, {type:'button', class:'kdencut-primary', disabled:''});
+  const showTrash = el('button', 'Recover deleted imports', cleanup, {type:'button'});
+  const purgeTrash = el('button', 'Permanently delete trash', cleanup, {type:'button', hidden:''});
+  const cleanupBack = el('button', 'Back to media', cleanup, {type:'button'});
+  let cleanupIds = new Set(), trashIds = [];
   const footer = el('footer', '', panel);
+  const spaceLabel = el('p', '', footer, {class:'kdencut-muted', 'aria-live':'polite'});
   const status = el('p', '', footer, {role: 'status', 'aria-live': 'polite'});
   const progress = el('progress', '', footer, {max: '100', value: '0', hidden: ''});
   const retryUpload = el('button', 'Retry upload', footer, {type: 'button', hidden: ''});
@@ -82,7 +97,7 @@
     progress.hidden = !value;
   }
   function page(which) {
-    device.hidden = which !== 'device'; storage.hidden = which !== 'storage'; nas.hidden = which !== 'nas';
+    device.hidden = which !== 'device'; storage.hidden = which !== 'storage'; nas.hidden = which !== 'nas'; cleanup.hidden = which !== 'cleanup';
     deviceTab.setAttribute('aria-pressed', String(which === 'device'));
     storageTab.setAttribute('aria-pressed', String(which !== 'device'));
     message('');
@@ -109,7 +124,56 @@
   storageTab.onclick = () => {page('storage'); loadSources();};
   addNas.onclick = () => page('nas');
   nasBack.onclick = () => page('storage');
+  cleanImports.onclick = () => page('cleanup');
+  cleanupBack.onclick = () => page('storage');
   const bytes = size => size >= 1024**3 ? `${(size/1024**3).toFixed(1)} GB` : `${(size/1024**2).toFixed(1)} MB`;
+  function showSpace(space) {
+    if (!space) return;
+    spaceLabel.textContent = `${space.low ? 'Low storage: ' : ''}${bytes(space.free)} free on server`;
+    spaceLabel.classList.toggle('kdencut-error', space.low);
+  }
+  review.onclick = async () => {
+    cleanupList.replaceChildren(); cleanupIds.clear(); purgeTrash.hidden = true; trashSelected.hidden = false;
+    trashSelected.disabled = true;
+    if (!scope.checked) return message('Confirm where your projects are saved before reviewing imports.', true);
+    lock(true); message('Checking saved projects and the open project…');
+    try {
+      const data = await api('cleanup-review');
+      for (const item of data.files) {
+        const row = el('label', '', cleanupList, {class:'kdencut-file'});
+        const check = el('input', '', row, {type:'checkbox'});
+        el('span', `${item.name} · ${bytes(item.size)}`, row);
+        check.onchange = () => {check.checked ? cleanupIds.add(item.id) : cleanupIds.delete(item.id); trashSelected.disabled = !cleanupIds.size;};
+      }
+      message(`${data.projects} saved project(s) checked. ${data.files.length} unused import(s) eligible.`);
+    } catch (error) {message(error.message, true);}
+    finally {lock(false); trashSelected.disabled = !cleanupIds.size;}
+  };
+  async function cleanupAction(action, ids) {
+    if (!scope.checked) return message('Confirm where your projects are saved first.', true);
+    lock(true);
+    try {
+      const data = await api('cleanup', {action, files:ids, confirmed_project_locations:true});
+      cleanupList.replaceChildren(); cleanupIds.clear(); trashIds = []; purgeTrash.hidden = true;
+      showSpace(data.space); message(action === 'trash' ? 'Moved to recoverable trash. Permanently deleting trash frees the space.' : action === 'restore' ? 'Import restored to its original location.' : 'Unused trash permanently deleted.');
+    } catch (error) {message(error.message, true);}
+    finally {lock(false); trashSelected.disabled = true;}
+  }
+  trashSelected.onclick = () => cleanupAction('trash', [...cleanupIds]);
+  showTrash.onclick = async () => {
+    cleanupList.replaceChildren(); trashSelected.hidden = true;
+    try {
+      const data = await api('cleanup-trash'); trashIds = data.files.map(item => item.id);
+      for (const item of data.files) {
+        const restore = el('button', `Restore ${item.name}`, cleanupList, {type:'button', class:'kdencut-directory'});
+        restore.onclick = () => cleanupAction('restore', [item.id]);
+      }
+      purgeTrash.hidden = !trashIds.length; message(trashIds.length ? 'Restore files here, or recheck usage and permanently delete trash.' : 'Trash is empty.');
+    } catch (error) {message(error.message, true);}
+  };
+  purgeTrash.onclick = () => {
+    if (confirm('Permanently delete these unused imports? This cannot be undone. Project usage will be checked again.')) cleanupAction('purge', trashIds);
+  };
 
   async function loadSources(preferred) {
     const currentId = request?.id;
@@ -257,6 +321,7 @@
   async function poll() {
     try {
       const data = await api('status');
+      showSpace(data.space);
       if (!data.request || data.job.state === 'done') {if (request) hide(); return;}
       if (data.request.id !== request?.id) {
         if (request) hide();
