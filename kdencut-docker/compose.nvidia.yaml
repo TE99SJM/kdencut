@@ -1,0 +1,14 @@
+services:
+  kdencut:
+    runtime: nvidia
+    environment:
+      KDENCUT_GPU: nvidia
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility,graphics,display
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

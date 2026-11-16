@@ -6,6 +6,7 @@
 #include "touchmode.h"
 #include "mobileworkspace.h"
 #include "palettewatcher.h"
+#include "runtimefeatures.h"
 #include "kdenlivesettings.h"
 
 #include <KColorSchemeManager>
@@ -80,6 +81,7 @@ void TouchMode::initialize(bool forceShowCursor)
         return;
     }
     m_initialized = true;
+    configureRuntimeFeatures();
     m_sessionShowCursor = forceShowCursor;
 
     // Must happen before the first KColorSchemeManager::instance() so the scheme is listed.
