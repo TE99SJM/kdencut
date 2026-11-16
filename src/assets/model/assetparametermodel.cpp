@@ -37,7 +37,8 @@ AssetParameterModel::AssetParameterModel(std::unique_ptr<Mlt::Properties> asset,
     QDomNodeList parameterNodes = assetXml.elementsByTagName(QStringLiteral("parameter"));
     m_hideKeyframesByDefault = assetXml.hasAttribute(QStringLiteral("hideKeyframes"));
     m_requiresInOut = assetXml.hasAttribute(QStringLiteral("requires_in_out"));
-    m_isAudio = assetXml.attribute(QStringLiteral("type")) == QLatin1String("audio");
+    m_isAudio =
+        assetXml.attribute(QStringLiteral("type")) == QLatin1String("audio") || assetXml.attribute(QStringLiteral("type")) == QLatin1String("audiotransition");
     if (m_asset->property_exists("kdenlive:builtin")) {
         m_builtIn = true;
     }
@@ -1462,9 +1463,10 @@ QJsonDocument AssetParameterModel::toJson(QVector<int> selection, bool includeFi
         currentParam.insert(QLatin1String("name"), QJsonValue(param.first));
         currentParam.insert(QLatin1String("DisplayName"), QJsonValue(param.second.name));
         if (param.second.value.typeId() == QMetaType::Double) {
-            currentParam.insert(QLatin1String("value"), QJsonValue(param.second.value.toDouble()));
+            currentParam.insert(QLatin1String("value"), QJsonValue(data(ix, AssetParameterModel::ValueRole).toDouble()));
         } else {
-            QString resultValue = param.second.value.toString();
+            // Get MLT's animation string
+            QString resultValue = data(ix, AssetParameterModel::ValueRole).toString();
             ParamType type = data(ix, AssetParameterModel::TypeRole).value<ParamType>();
             if (percentageExport &&
                 (type == ParamType::AnimatedRect || type == ParamType::AnimatedFakeRect || type == ParamType::FakeRect ||
@@ -2018,4 +2020,9 @@ bool AssetParameterModel::isDefault() const
     }
     qDebug() << "YYYYYYYYYYYYY DISABLING EFFECT:\n";
     return true;
+}
+
+bool AssetParameterModel::isAudio() const
+{
+    return m_isAudio;
 }

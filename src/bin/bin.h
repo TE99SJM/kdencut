@@ -190,8 +190,8 @@ namespace BinColumns {
 inline constexpr int Name = 0;
 inline constexpr int Date = 1;
 inline constexpr int Description = 2;
-inline constexpr int Rating = 3;
-inline constexpr int FPS = 4;
+inline constexpr int Rating = 7;
+inline constexpr int FPS = 9;
 } // namespace BinColumns
 
 /**
@@ -324,6 +324,8 @@ public:
     void emitRefreshPanel(const QString &id);
     /** @brief Returns true if there is a clip in bin. Timeline clips are ignored. */
     bool hasUserClip() const;
+    /** @brief Returns true if there is any another item in bin than main sequence. */
+    bool isEmpty() const;
     /** @brief Trigger reload of all clips. */
     void reloadAllProducers(bool reloadThumbs = true);
     /** @brief Ensure all audio thumbs have been created */
