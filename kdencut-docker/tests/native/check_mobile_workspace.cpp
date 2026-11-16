@@ -83,6 +83,45 @@ class MobileChecks : public QObject
 {
     Q_OBJECT
 private Q_SLOTS:
+    void phoneEditingCommands()
+    {
+        QAction speed;
+        QAction advanced;
+        KdenCut::MobileWorkspace workspace(new QLabel("Preview"), new QLabel("Timeline"),
+            {{QStringLiteral("edit_item_speed"), &speed}, {QStringLiteral("project_render"), &advanced}});
+        workspace.resize(390, 844);
+        workspace.show();
+        QSignalSpy commands(&workspace, &KdenCut::MobileWorkspace::command);
+        QSignalSpy speeds(&speed, &QAction::triggered);
+        QSignalSpy exports(&advanced, &QAction::triggered);
+        const auto tap = [&](const char *name) {
+            auto *control = workspace.findChild<QToolButton *>(QString::fromLatin1(name));
+            QVERIFY(control);
+            control->click();
+        };
+        workspace.showEditTools();
+        tap("mobile_edit_item_speed");
+        QCOMPARE(speeds.size(), 1);
+        tap("mobile_volume");
+        QCOMPARE(commands.last().first().toString(), QStringLiteral("volume"));
+        tap("mobile_tools");
+        tap("mobile_ratio");
+        for (const char *ratio : {"portrait", "square", "landscape"}) {
+            tap(qPrintable(QStringLiteral("mobile_ratio-") + QString::fromLatin1(ratio)));
+            QCOMPARE(commands.last().first().toString(), QStringLiteral("ratio-") + QString::fromLatin1(ratio));
+        }
+        tap("mobileExport");
+        for (const char *platform : {"TikTok", "Reels", "Shorts"}) {
+            const QString name = QStringLiteral("export-") + QString::fromLatin1(platform);
+            auto *control = workspace.findChild<QToolButton *>(QStringLiteral("mobile_") + name);
+            QVERIFY(control && control->isVisible());
+            control->click();
+            QCOMPARE(commands.last().first().toString(), name);
+        }
+        tap("mobile_project_render");
+        QCOMPARE(exports.size(), 1);
+    }
+
     void panelExitsExpandedPreview()
     {
         auto *preview = new QLabel(QStringLiteral("Preview"));

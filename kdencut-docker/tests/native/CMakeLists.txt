@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 project(KdenCutMobileChecks LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_AUTOMOC ON)
-find_package(Qt6 REQUIRED COMPONENTS Widgets Test QuickWidgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Test QuickWidgets Xml)
 add_executable(check_mobile_workspace
     check_mobile_workspace.cpp
     ../../../src/kdencut/mobileworkspace.cpp
@@ -26,3 +26,8 @@ add_test(NAME media_bridge COMMAND check_media_bridge)
 set_tests_properties(media_bridge PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 add_test(NAME mobile_workspace COMMAND check_mobile_workspace)
 set_tests_properties(mobile_workspace PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+
+add_executable(check_phone_presets check_phone_presets.cpp)
+target_link_libraries(check_phone_presets PRIVATE Qt6::Test Qt6::Xml)
+target_compile_definitions(check_phone_presets PRIVATE KDENCUT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../..")
+add_test(NAME phone_presets COMMAND check_phone_presets)

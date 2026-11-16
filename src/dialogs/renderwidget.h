@@ -97,6 +97,8 @@ public:
     void setRenderProgress(const QString &dest, int progress = 0, int frame = 0);
     void setRenderStatus(const QString &dest, int status, const QString &error);
     void setRenderProfile(const QMap<QString, QString> &props);
+    /** Start a portrait social export using the validated KdenCut encoder. */
+    void startMobileExport(const QString &platform);
     void saveRenderProfile();
     void updateDocumentPath();
     int waitingJobsCount() const;

@@ -125,4 +125,16 @@
   <name>Images sequence</name>
   <profile name="PNG with alpha" extension="png" args="progressive=1 f=image2 vcodec=png an=1 audio_off=1 g=1 bg=0 pix_fmt=rgba"/>
  </group>
+ <group renderer="avformat" type="av" id="kdencut">
+  <name>KdenCut social video</name>
+  <profile name="KdenCut TikTok (software)" extension="mp4" args="f=mp4 movflags=+faststart s=1080x1920 progressive=1 vcodec=libx264 crf=20 preset=fast pix_fmt=yuv420p acodec=aac ab=192k ar=48000 channels=2"/>
+  <profile name="KdenCut TikTok (NVIDIA)" extension="mp4" args="f=mp4 movflags=+faststart s=1080x1920 progressive=1 vcodec=h264_nvenc vb=12M pix_fmt=yuv420p acodec=aac ab=192k ar=48000 channels=2"/>
+  <profile name="KdenCut TikTok (VAAPI)" extension="mp4" args="f=mp4 movflags=+faststart s=1080x1920 progressive=1 vcodec=h264_vaapi vb=12M acodec=aac ab=192k ar=48000 channels=2"/>
+  <profile name="KdenCut Reels (software)" extension="mp4" args="f=mp4 movflags=+faststart s=1080x1920 progressive=1 vcodec=libx264 crf=20 preset=fast pix_fmt=yuv420p acodec=aac ab=192k ar=48000 channels=2"/>
+  <profile name="KdenCut Reels (NVIDIA)" extension="mp4" args="f=mp4 movflags=+faststart s=1080x1920 progressive=1 vcodec=h264_nvenc vb=12M pix_fmt=yuv420p acodec=aac ab=192k ar=48000 channels=2"/>
+  <profile name="KdenCut Reels (VAAPI)" extension="mp4" args="f=mp4 movflags=+faststart s=1080x1920 progressive=1 vcodec=h264_vaapi vb=12M acodec=aac ab=192k ar=48000 channels=2"/>
+  <profile name="KdenCut Shorts (software)" extension="mp4" args="f=mp4 movflags=+faststart s=1080x1920 progressive=1 vcodec=libx264 crf=20 preset=fast pix_fmt=yuv420p acodec=aac ab=192k ar=48000 channels=2"/>
+  <profile name="KdenCut Shorts (NVIDIA)" extension="mp4" args="f=mp4 movflags=+faststart s=1080x1920 progressive=1 vcodec=h264_nvenc vb=12M pix_fmt=yuv420p acodec=aac ab=192k ar=48000 channels=2"/>
+  <profile name="KdenCut Shorts (VAAPI)" extension="mp4" args="f=mp4 movflags=+faststart s=1080x1920 progressive=1 vcodec=h264_vaapi vb=12M acodec=aac ab=192k ar=48000 channels=2"/>
+ </group>
 </profiles>

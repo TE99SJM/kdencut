@@ -178,7 +178,7 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
     header->addWidget(title, 1);
     header->addWidget(button(tr("Media"), QStringLiteral("list-add"), QStringLiteral("media"), false));
     header->addWidget(actionButton(QStringLiteral("file_save"), tr("Save"), QStringLiteral("document-save"), false));
-    auto *exportButton = actionButton(QStringLiteral("project_render"), tr("Export"), QStringLiteral("document-export"), false);
+    auto *exportButton = button(tr("Export"), QStringLiteral("document-export"), QStringLiteral("export"), false);
     exportButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
     exportButton->setObjectName(QStringLiteral("mobileExport"));
     header->addWidget(exportButton);
@@ -258,17 +258,38 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
         button(tr("Captions"), QStringLiteral("add-subtitle"), QStringLiteral("captions")),
         button(tr("Filters"), QStringLiteral("filters"), QStringLiteral("filters")),
         button(tr("Adjust"), QStringLiteral("configure"), QStringLiteral("adjust")),
+        button(tr("Ratio"), QStringLiteral("transform-scale"), QStringLiteral("ratio")),
         button(tr("Transitions"), QStringLiteral("view-split-left-right"), QStringLiteral("transitions"))});
     m_editTools = toolStrip({
         button(tr("Back"), QStringLiteral("go-previous"), QStringLiteral("tools")),
         actionButton(QStringLiteral("cut_timeline_clip"), tr("Split"), QStringLiteral("edit-cut")),
         actionButton(QStringLiteral("delete_timeline_selection"), tr("Delete"), QStringLiteral("edit-delete")),
         actionButton(QStringLiteral("duplicate_timeline_clip"), tr("Duplicate"), QStringLiteral("edit-copy")),
+        actionButton(QStringLiteral("edit_item_speed"), tr("Speed"), QStringLiteral("speedometer")),
+        button(tr("Volume"), QStringLiteral("audio-volume-high"), QStringLiteral("volume")),
         actionButton(QStringLiteral("zoom_fit"), tr("Fit"), QStringLiteral("zoom-fit-best")),
         actionButton(QStringLiteral("view_zoom_out"), tr("Zoom out"), QStringLiteral("zoom-out")),
         actionButton(QStringLiteral("view_zoom_in"), tr("Zoom in"), QStringLiteral("zoom-in"))});
     m_tools->addWidget(m_mainTools);
     m_tools->addWidget(m_editTools);
+    auto *ratios = toolStrip({button(tr("Back"), QStringLiteral("go-previous"), QStringLiteral("tools")),
+        button(QStringLiteral("9:16"), QStringLiteral("transform-scale"), QStringLiteral("ratio-portrait")),
+        button(QStringLiteral("1:1"), QStringLiteral("transform-scale"), QStringLiteral("ratio-square")),
+        button(QStringLiteral("16:9"), QStringLiteral("transform-scale"), QStringLiteral("ratio-landscape"))});
+    auto *exports = toolStrip({button(tr("Back"), QStringLiteral("go-previous"), QStringLiteral("tools")),
+        button(QStringLiteral("TikTok"), QStringLiteral("document-export"), QStringLiteral("export-TikTok")),
+        button(QStringLiteral("Reels"), QStringLiteral("document-export"), QStringLiteral("export-Reels")),
+        button(QStringLiteral("Shorts"), QStringLiteral("document-export"), QStringLiteral("export-Shorts")),
+        actionButton(QStringLiteral("project_render"), tr("Advanced"), QStringLiteral("configure"))});
+    m_tools->addWidget(ratios);
+    m_tools->addWidget(exports);
+    connect(this, &MobileWorkspace::command, this, [this, ratios, exports](const QString &name) {
+        if (name == QLatin1String("ratio") || name == QLatin1String("export")) {
+            m_lower->show();
+            m_tools->show();
+            m_tools->setCurrentWidget(name == QLatin1String("ratio") ? ratios : exports);
+        }
+    });
     m_tools->setFixedHeight(qMax(m_mainTools->height(), m_editTools->height()));
     editor->addWidget(m_tools);
     m_pages->addWidget(m_editor);

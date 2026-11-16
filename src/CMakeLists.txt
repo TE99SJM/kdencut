@@ -86,6 +86,8 @@ list(APPEND kdenlive_SRCS
     kdencut/mediaimportbridge.cpp
     kdencut/mediaprojectusage.cpp
     kdencut/runtimefeatures.cpp
+    kdencut/mobileediting.cpp
+    kdencut/mobileexport.cpp
 )
 
 if(CRASH_AUTO_TEST)

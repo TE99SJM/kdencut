@@ -9,6 +9,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include "kdencut/mobileworkspace.h"
 #include "kdencut/mediaimportbridge.h"
 #include "kdencut/mediaprojectusage.h"
+#include "kdencut/mobileediting.h"
 #include "monitor/monitorproxy.h"
 #include "assets/assetpanel.hpp"
 #include "audiomixer/mixermanager.hpp"
@@ -4738,6 +4739,17 @@ void MainWindow::touchCommand(const QString &name)
         m_projectMonitor->slotPlay();
     } else if (name == QLatin1String("media")) {
         showTouchPanel(m_projectBinDock);
+    } else if (name.startsWith(QLatin1String("ratio-"))) {
+        closeTouchPanel();
+        KdenCut::setMobileAspect(name.mid(6), this);
+    } else if (name.startsWith(QLatin1String("export-"))) {
+        closeTouchPanel();
+        if (getCurrentTimeline() && pCore->currentDoc()) {
+            slotRenderProject();
+            if (m_renderWidget) m_renderWidget->startMobileExport(name.mid(7));
+        }
+    } else if (name == QLatin1String("volume")) {
+        if (KdenCut::editMobileVolume(getCurrentTimeline(), this)) showTouchPanel(m_effectStackDock);
     } else if (name == QLatin1String("audio")) {
         importTouchMedia(true);
     } else if (name == QLatin1String("text")) {
