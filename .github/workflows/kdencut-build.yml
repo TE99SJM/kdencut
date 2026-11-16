@@ -2,7 +2,7 @@ name: KdenCut container build
 
 on:
   push:
-    branches: [kdencut-touch-capcut, kdencut-mobile-layout, kdencut-device-nas-import]
+    branches: [kdencut-touch-capcut, kdencut-mobile-layout, kdencut-device-nas-import, kdencut-phone-completion]
     paths:
       - 'src/**'
       - 'kdencut-docker/**'
@@ -29,7 +29,7 @@ jobs:
       - name: Build the production container, including QML lint
         run: docker build --build-arg BUILD_JOBS=2 -f kdencut-docker/Dockerfile -t kdencut-ci .
       - name: Check phone viewport messages
-        run: node --test kdencut-docker/tests/test_mobile_logic.cjs
+        run: node --test kdencut-docker/tests/test_*.cjs
       - name: Compile and run the native phone layout checks
         run: |
           docker run --rm --entrypoint /bin/bash -v "$PWD:/src:ro" kdencut-ci -lc '

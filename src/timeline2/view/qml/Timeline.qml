@@ -144,7 +144,7 @@ Rectangle {
 
     function fitZoom() {
         if (root.mobileLayout) return Math.max(0.01, root.width * 0.8 / Math.max(root.timeline.duration, K.Core.getCurrentFps() * 5))
-        return scrollView.width / (root.timeline.duration * 1.1)
+        return Math.max(0.01, scrollView.width / (Math.max(1, root.timeline.duration) * 1.1))
     }
 
     function scrollPos() {
@@ -1471,7 +1471,7 @@ function getTrackColor(audio, header) {
                     if (!active) {
                         return
                     }
-                    var minScale = root.fitZoom() / 4
+                    var minScale = Math.min(40, root.fitZoom() / 4)
                     var newScale = Math.max(minScale, Math.min(startScale * activeScale, 40))
                     var desiredX = anchorFrame * newScale - anchorX - activeTranslation.x
                     scrollView.contentY = root.clampContentY(startContentY - activeTranslation.y)

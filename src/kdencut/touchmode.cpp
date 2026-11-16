@@ -5,6 +5,7 @@
 
 #include "touchmode.h"
 #include "mobileworkspace.h"
+#include "palettewatcher.h"
 #include "kdenlivesettings.h"
 
 #include <KColorSchemeManager>
@@ -55,6 +56,7 @@ TouchMode *TouchMode::instance()
 TouchMode::TouchMode(QObject *parent)
     : QObject(parent)
 {
+    watchStylePalette(this);
 }
 
 qreal TouchMode::sizeMultiplier()
