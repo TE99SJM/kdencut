@@ -3,12 +3,15 @@ project(KdenCutMobileChecks LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_AUTOMOC ON)
 find_package(Qt6 REQUIRED COMPONENTS Widgets Test QuickWidgets Xml)
+find_package(KF6I18n REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../make_test_catalog.py ${CMAKE_CURRENT_BINARY_DIR}/translations COMMAND_ERROR_IS_FATAL ANY)
 add_executable(check_mobile_workspace
     check_mobile_workspace.cpp
     ../../../src/kdencut/mobileworkspace.cpp
     ../../../src/kdencut/mobileworkspace.h)
-target_link_libraries(check_mobile_workspace PRIVATE Qt6::Widgets Qt6::Test Qt6::QuickWidgets)
-target_compile_definitions(check_mobile_workspace PRIVATE KDENCUT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../..")
+target_link_libraries(check_mobile_workspace PRIVATE Qt6::Widgets Qt6::Test Qt6::QuickWidgets KF6::I18n)
+target_compile_definitions(check_mobile_workspace PRIVATE KDENCUT_TEST_LOCALE="${CMAKE_CURRENT_BINARY_DIR}/translations" KDENCUT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../..")
 find_package(KDDockWidgets-qt6 2.4.0 QUIET)
 if(TARGET KDAB::kddockwidgets)
     target_link_libraries(check_mobile_workspace PRIVATE KDAB::kddockwidgets)

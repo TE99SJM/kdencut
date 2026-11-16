@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL */
 #include "../../../src/kdencut/mobileworkspace.h"
 #include <QAction>
+#include <KLocalizedString>
+#include <clocale>
 #include <QApplication>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -83,6 +85,26 @@ class MobileChecks : public QObject
 {
     Q_OBJECT
 private Q_SLOTS:
+    void gettextLabels()
+    {
+        // GNU gettext deliberately ignores LANGUAGE in the C locale.
+        const QByteArray previousLocale = std::setlocale(LC_MESSAGES, nullptr);
+        QVERIFY(std::setlocale(LC_MESSAGES, "en_US.UTF-8"));
+        KLocalizedString::addDomainLocaleDir("kdencut-test", QStringLiteral(KDENCUT_TEST_LOCALE));
+        KLocalizedString::setApplicationDomain("kdencut-test");
+        const auto original = KLocalizedString::languages();
+        KLocalizedString::setLanguages({QStringLiteral("fr")});
+        KdenCut::MobileWorkspace workspace(new QLabel("Preview"), new QLabel("Timeline"), {});
+        QCOMPARE(workspace.findChild<QToolButton *>("mobile_home")->text(), QStringLiteral("Accueil test"));
+        workspace.setTimecode(QStringLiteral("00:00:01"));
+        QCOMPARE(workspace.accessibleDescription(), QStringLiteral("Position test 00:00:01"));
+        workspace.setPlaying(true);
+        QCOMPARE(workspace.findChild<QToolButton *>("mobile_play")->accessibleName(), QStringLiteral("Pause test"));
+        KLocalizedString::setLanguages(original);
+        KLocalizedString::setApplicationDomain("kdenlive");
+        std::setlocale(LC_MESSAGES, previousLocale.constData());
+    }
+
     void phoneEditingCommands()
     {
         QAction speed;
