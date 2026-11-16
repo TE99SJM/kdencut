@@ -91,6 +91,25 @@ class BrowserMediaTests(unittest.TestCase):
         self.assertEqual(self.wait_result()['paths'], [str(clip)])
         self.assertEqual(self.errors, [])
 
+    def test_chunk_upload_resumes_after_lost_response(self):
+        offsets = []
+        def drop_first_response(route):
+            from urllib.parse import parse_qs, urlsplit
+            offsets.append(int(parse_qs(urlsplit(route.request.url).query)['offset'][0]))
+            if len(offsets) == 1:
+                route.fetch()  # Server has saved the chunk, but the phone misses the reply.
+                route.abort('connectionreset')
+            else:
+                route.continue_()
+        self.page.route('**/upload-chunk?*', drop_first_response)
+        payload = b'v' * (media.CHUNK_SIZE * 2 + 9)
+        self.page.get_by_role('button', name='This device').click()
+        self.page.get_by_label('Browse device files').set_input_files({'name':'resumed.mov', 'mimeType':'video/quicktime', 'buffer':payload})
+        result = self.wait_result()
+        self.assertEqual(Path(result['paths'][0]).read_bytes(), payload)
+        self.assertEqual(offsets, [0, media.CHUNK_SIZE, media.CHUNK_SIZE * 2])
+        self.assertEqual(self.errors, [])
+
     def test_portrait_storage_long_names_and_selection(self):
         folder = self.root/'media'/'Portrait'
         folder.mkdir(exist_ok=True)

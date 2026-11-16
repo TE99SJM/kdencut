@@ -3,6 +3,7 @@
   if (/^#(shared|player[234])(?:[?&]|$)/.test(location.hash)) return;
   const base = new URL('kdencut-media/', document.baseURI);
   let request = null, busy = false, xhr = null, source = '', path = '', browseSerial = 0;
+  let pendingUpload = [], uploadRun = 0;
   const selected = new Set();
   const el = (tag, text, parent, attrs = {}) => {
     const node = document.createElement(tag);
@@ -57,6 +58,7 @@
   const footer = el('footer', '', panel);
   const status = el('p', '', footer, {role: 'status', 'aria-live': 'polite'});
   const progress = el('progress', '', footer, {max: '100', value: '0', hidden: ''});
+  const retryUpload = el('button', 'Retry upload', footer, {type: 'button', hidden: ''});
   const serverPicker = el('button', 'Open server file picker', footer, {type: 'button', class: 'kdencut-muted'});
   let connections = new Set();
 
@@ -65,7 +67,7 @@
       headers: {'X-KdenCut-Media': '1', ...(body ? {'Content-Type': 'application/json'} : {})},
       ...(body ? {body: JSON.stringify(body)} : {})});
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Could not complete the request');
+    if (!response.ok) throw Object.assign(new Error(data.error || 'Could not complete the request'), {retryable: response.status >= 500});
     return data;
   }
   function message(text, error = false) {
@@ -86,12 +88,14 @@
     message('');
   }
   function hide() {
+    uploadRun++; pendingUpload = []; retryUpload.hidden = true;
     request = null; browseSerial++; selected.clear();
     if (xhr) xhr.abort();
     xhr = null; lock(false); panel.close(); nas.reset();
     photoInput.value = ''; fileInput.value = '';
   }
   async function cancel(mode = 'cancel') {
+    uploadRun++; pendingUpload = []; retryUpload.hidden = true;
     const id = request?.id;
     if (xhr) xhr.abort();
     if (!id) return hide();
@@ -172,43 +176,82 @@
       await api('select', {request: currentId, source, paths: [...selected]});
     } catch (error) {if (request?.id === currentId) {lock(false); message(error.message, true);}}
   };
-  function sendFile(file, id, index, total) {
+  function sendChunk(file, id, state, index, total) {
     return new Promise((resolve, reject) => {
       const transfer = new XMLHttpRequest(); xhr = transfer;
-      transfer.open('PUT', new URL('upload?' + new URLSearchParams({request: id, name: file.name}), base));
+      transfer.open('PUT', new URL('upload-chunk?' + new URLSearchParams({request: id, token: state.token, offset: state.offset}), base));
+      transfer.timeout = 120000;
       transfer.setRequestHeader('X-KdenCut-Media', '1');
       transfer.upload.onprogress = event => {
         if (request?.id !== id) return;
-        progress.value = event.lengthComputable ? event.loaded/event.total*100 : 0;
-        message(`Uploading ${index}/${total}: ${file.name} · ${bytes(event.loaded)}${event.lengthComputable ? ' / ' + bytes(event.total) : ''}`);
+        progress.value = (state.offset + event.loaded) / file.size * 100;
+        message(`Uploading ${index}/${total}: ${file.name} · ${bytes(state.offset + event.loaded)} / ${bytes(file.size)}`);
       };
       transfer.onload = () => {
         if (xhr === transfer) xhr = null;
         try {
           const data = JSON.parse(transfer.responseText);
-          if (transfer.status < 200 || transfer.status >= 300) throw new Error(data.error || 'Upload failed');
-          resolve(data.token);
+          if (transfer.status < 200 || transfer.status >= 300) throw Object.assign(new Error(data.error || 'Upload failed'), {retryable: transfer.status >= 500});
+          resolve(data);
         } catch (error) {reject(error);}
       };
-      transfer.onerror = () => reject(new Error('Upload interrupted. Check your connection and choose the files again.'));
-      transfer.onabort = () => reject(new Error('Upload cancelled'));
-      transfer.send(file);
+      transfer.onerror = transfer.ontimeout = () => {
+        if (xhr === transfer) xhr = null;
+        reject(new Error('Connection dropped. Your completed chunks are saved.'));
+      };
+      transfer.onabort = () => reject(Object.assign(new Error('Upload cancelled'), {retryable: false}));
+      transfer.send(file.slice(state.offset, state.offset + state.chunk_size));
     });
+  }
+  async function sendFile(file, id, index, total, run) {
+    // Sample both ends as well as metadata, without reading a large video into RAM.
+    // This is an identity check for resuming, not a security hash.
+    const sample = new Uint8Array(await new Blob([file.slice(0, 65536), file.slice(Math.max(0, file.size - 65536))]).arrayBuffer());
+    let hash = 2166136261;
+    for (const byte of sample) hash = Math.imul(hash ^ byte, 16777619) >>> 0;
+    const fingerprint = `${file.lastModified}:${file.size}:${hash}`;
+    let failures = 0;
+    while (request?.id === id && uploadRun === run) {
+      try {
+        let state = await api('upload-start', {request: id, name: file.name, size: file.size, fingerprint});
+        while (!state.complete && request?.id === id && uploadRun === run) {
+          state = await sendChunk(file, id, state, index, total);
+          failures = 0;
+        }
+        if (state.complete) return state.token;
+      } catch (error) {
+        if (uploadRun !== run || request?.id !== id || error.retryable === false || failures >= 3) throw error;
+        failures++;
+        message(`Connection interrupted. Retrying ${failures}/3 from the last saved chunk…`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * 2**(failures - 1)));
+      }
+    }
+    throw Object.assign(new Error('Upload cancelled'), {retryable: false});
   }
   async function upload(input) {
     const chosen = [...input.files]; input.value = '';
     if (!chosen.length || !request || busy) return;
-    const id = request.id; const tokens = []; lock(true); progress.value = 0;
+    pendingUpload = chosen;
+    await resumeUpload();
+  }
+  async function resumeUpload() {
+    if (!request || busy || !pendingUpload.length) return;
+    const id = request.id, run = ++uploadRun, chosen = pendingUpload;
+    const tokens = []; lock(true); progress.value = 0; retryUpload.hidden = true;
     try {
       for (const [index, file] of chosen.entries()) {
-        if (request?.id !== id) return;
-        tokens.push(await sendFile(file, id, index + 1, chosen.length));
+        if (request?.id !== id || uploadRun !== run) return;
+        tokens.push(await sendFile(file, id, index + 1, chosen.length, run));
       }
-      if (request?.id === id) {message('Adding media to KdenCut…'); await api('finish', {request: id, files: tokens});}
+      if (request?.id === id && uploadRun === run) {message('Adding media to KdenCut…'); await api('finish', {request: id, files: tokens});}
     } catch (error) {
-      if (request?.id === id) {lock(false); message(error.message, true);}
+      if (request?.id === id && uploadRun === run) {
+        lock(false); retryUpload.hidden = false;
+        message(error.message + ' Tap Retry upload to continue.', true);
+      }
     }
   }
+  retryUpload.onclick = resumeUpload;
   photoInput.onchange = () => upload(photoInput);
   fileInput.onchange = () => upload(fileInput);
   async function poll() {

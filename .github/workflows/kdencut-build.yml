@@ -47,7 +47,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Check uploads and NAS file handling
-        run: python3 -m unittest discover -s kdencut-docker/tests -p test_media_server.py -v
+        run: |
+          python3 -m unittest discover -s kdencut-docker/tests -p test_media_server.py -v
+          python3 -m unittest discover -s kdencut-docker/tests -p test_resumable_uploads.py -v
       - name: Install media integration test dependencies
         run: |
           python3 -m venv /tmp/media-tests
