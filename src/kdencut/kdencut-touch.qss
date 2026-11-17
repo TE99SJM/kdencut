@@ -180,7 +180,7 @@ QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
     image: url(:/kdencut/controls/decrease.svg);
     width: 18px; height: 18px;
 }
-QComboBox { padding-right: 44px; }
+QComboBox { padding-right: 44px; combobox-popup: 0; }
 QComboBox::down-arrow {
     image: url(:/kdencut/controls/dropdown.svg);
     width: 18px; height: 18px;

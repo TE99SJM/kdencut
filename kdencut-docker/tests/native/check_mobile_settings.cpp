@@ -209,6 +209,21 @@ private Q_SLOTS:
         QTRY_VERIFY(area.verticalScrollBar()->value() > 50);
         QCOMPARE(clicked.count(), 1); // a swipe beginning on a button must not activate it
     }
+    void dropdownOptionsAcceptFingerSizedTaps()
+    {
+        QComboBox combo;
+        for (int i = 0; i < 30; ++i) combo.addItem(QStringLiteral("Preset %1").arg(i));
+        combo.resize(280, 52);
+        combo.show();
+        combo.showPopup();
+        QTest::qWait(30);
+        auto *view = combo.view();
+        KdenCut::enableSwipeScrolling(view, true);
+        const QRect row = view->visualRect(combo.model()->index(1, 0));
+        QVERIFY(row.height() >= 48);
+        QTest::mouseClick(view->viewport(), Qt::LeftButton, Qt::NoModifier, row.center());
+        QTRY_COMPARE(combo.currentIndex(), 1);
+    }
     void numericButtonsHaveSeparateTouchTargets()
     {
         QSpinBox spin;
