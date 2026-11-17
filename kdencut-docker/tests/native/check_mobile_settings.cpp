@@ -184,6 +184,20 @@ private Q_SLOTS:
         QTest::qWait(100);
         QVERIFY(area.verticalScrollBar()->value() >= released);
         QCOMPARE(clicked.count(), 1);
+        QScroller::scroller(viewport)->stop();
+        area.verticalScrollBar()->setValue(0);
+        QTest::qWait(30);
+        const QPoint start = button->rect().center();
+        QTest::mousePress(button, Qt::LeftButton, Qt::NoModifier, start);
+        for (int delta = 20; delta <= 220; delta += 20) {
+            const QPoint point = start - QPoint(0, delta);
+            QMouseEvent move(QEvent::MouseMove, point, button->mapToGlobal(point), Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(button, &move);
+            QTest::qWait(16);
+        }
+        QTest::mouseRelease(button, Qt::LeftButton, Qt::NoModifier, start - QPoint(0, 220));
+        QTRY_VERIFY(area.verticalScrollBar()->value() > 50);
+        QCOMPARE(clicked.count(), 1); // a swipe beginning on a button must not activate it
     }
     void numericButtonsHaveSeparateTouchTargets()
     {
