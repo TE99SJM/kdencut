@@ -1,12 +1,12 @@
 #kdencut-media-dialog { color-scheme: dark; color: #f0f0f0; background: #17191c; border: 1px solid #373b42; border-radius: 18px; padding: 16px; box-sizing: border-box; width: min(520px, calc(100vw - 16px)); max-width: calc(100vw - 16px); height: min(900px, calc(100dvh - 16px)); max-height: calc(100dvh - 16px); margin: auto; overflow: hidden; font: 15px/1.45 system-ui, sans-serif; }
 #kdencut-media-dialog[open] { display: flex; flex-direction: column; }
-#kdencut-media-dialog > section { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+#kdencut-media-dialog > section { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 #kdencut-media-dialog::backdrop { background: #000b; }
 #kdencut-media-dialog [hidden] { display: none !important; }
 #kdencut-media-dialog header, #kdencut-media-dialog nav { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-shrink: 0; }
 #kdencut-media-dialog header { justify-content: space-between; }
 #kdencut-media-dialog h2 { margin: 0; font-size: 22px; }
-#kdencut-media-dialog button, #kdencut-media-dialog select { font: inherit; color: inherit; border: 1px solid #42464d; border-radius: 9px; background: #282c31; padding: 10px 12px; min-height: 44px; cursor: pointer; }
+#kdencut-media-dialog button, #kdencut-media-dialog select { font: inherit; color: inherit; border: 1px solid #42464d; border-radius: 9px; background: #282c31; padding: 10px 12px; min-height: 52px; min-width: 52px; cursor: pointer; }
 #kdencut-media-dialog button:disabled, #kdencut-media-dialog input:disabled { opacity: .5; cursor: default; }
 #kdencut-media-dialog nav button { flex: 1; min-width: 0; padding: 10px 6px; }
 #kdencut-media-dialog nav button[aria-pressed="true"] { border-color: #04c7d6; color: #5aebf2; }

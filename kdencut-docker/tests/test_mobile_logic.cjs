@@ -16,8 +16,8 @@ function client(width, height, {touch = true, hash = ''} = {}) {
   const window = {innerWidth: width, innerHeight: height, visualViewport: viewport, matchMedia: () => pointer,
     addEventListener: listen, postMessage: value => messages.push(value)};
   const location = {origin: 'https://kdencut.test', hash};
-  const document = {documentElement: root, body: {}, getElementById: () => ({}), querySelector: () => ({getBoundingClientRect: () => ({width: viewport.width, height: viewport.height - 56})})};
-  vm.runInNewContext(source, {window, document, location, ResizeObserver: class {observe() {}},
+  const document = {documentElement: root, body: {}, getElementById: () => ({}), querySelector: () => ({getBoundingClientRect: () => ({width: viewport.width, height: viewport.height - 64})})};
+  vm.runInNewContext(source, {window, document, location, ResizeObserver: class {observe() {}}, MutationObserver: class {observe() {} disconnect() {}},
     setTimeout: fn => {timers.set(++nextTimer, fn); return nextTimer;}, clearTimeout: id => timers.delete(id)});
   const flush = () => {for (const [id, fn] of timers) {timers.delete(id);fn();}};
   const emit = (type, value) => {for (const fn of listeners.get(type) || []) fn(value);flush();};
@@ -29,13 +29,13 @@ const lastSize = c => c.messages.filter(m=>m.type === 'setManualResolution').at(
 const checkSize = c => {
   const size=lastSize(c);assert.ok(size.width>=320);assert.ok(size.height>=280);
   assert.equal(size.width%2,0);assert.equal(size.height%2,0);
-  assert.ok(Math.abs(size.width/size.height-c.viewport.width/(c.viewport.height-56))<.01);
+  assert.ok(Math.abs(size.width/size.height-c.viewport.width/(c.viewport.height-64))<.01);
   assert.equal(c.messages.at(-1).settings.scaling_dpi,96);
 };
 test('phone portrait and landscape use phone-sized logical pixels',()=>{
   for(const [w,h] of [[320,568],[375,667],[430,932],[932,430],[1024,768]]){
     const c=client(w,h);c.connect();checkSize(c);
-    if (w >= 320 && h - 56 >= 280) assert.equal(lastSize(c).width, Math.ceil(w/2)*2);
+    if (w >= 320 && h - 64 >= 280) assert.equal(lastSize(c).width, Math.ceil(w/2)*2);
     c.resize(h,w);checkSize(c);
   }
 });

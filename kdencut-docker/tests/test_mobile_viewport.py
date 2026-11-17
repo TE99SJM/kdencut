@@ -21,7 +21,7 @@ class MobileViewportTest(unittest.TestCase):
         cls.browser.close()
         cls.pw.stop()
 
-    def page(self, width, height, touch=True):
+    def page(self, width, height, touch=True, hash=""):
         ctx = self.browser.new_context(viewport={'width': width, 'height': height}, has_touch=touch, is_mobile=touch, device_scale_factor=3 if touch else 1)
         self.addCleanup(ctx.close)
         page = ctx.new_page()
@@ -33,7 +33,7 @@ class MobileViewportTest(unittest.TestCase):
           <div id="app"><div class="video-container"></div></div>
           <button class="virtual-keyboard-button" data-virtual-keyboard-button>Keyboard</button>
           <script>window.sent=[];addEventListener('message', e=>sent.push(e.data));</script>'''))
-        page.goto('http://kdencut.test/')
+        page.goto('http://kdencut.test/' + hash)
         page.add_style_tag(path=str(ASSETS / 'mobile.css'))
         page.add_script_tag(path=str(ASSETS / 'mobile.js'))
         return page
@@ -80,6 +80,72 @@ class MobileViewportTest(unittest.TestCase):
         self.settings(page)
         self.assertFalse(page.evaluate("document.documentElement.classList.contains('kdencut-mobile')"))
         self.assertEqual(page.evaluate("sent.filter(x=>x.type!=='serverSettings')"), [])
+
+    def attach_stream_input(self, page):
+        page.evaluate("""() => {
+          const host = document.querySelector('.video-container');
+          host.innerHTML = '<canvas id="videoCanvas" style="width:100%;height:100%"></canvas><div id="overlayInput" style="position:absolute;inset:0;touch-action:none"></div>';
+          const cursorDiv = document.createElement('canvas');
+          cursorDiv.width=24; cursorDiv.height=24;
+          cursorDiv.style.cssText='position:fixed;left:50px;top:50px;display:block;pointer-events:none;z-index:999999';
+          document.body.append(cursorDiv);
+          const element = document.querySelector('#overlayInput');
+          element.style.setProperty('cursor', 'crosshair', 'important');
+          window.webrtcInput = {element, cursorDiv};
+          window.received=[];
+          for(const name of ['touchstart','touchmove','touchend','mousedown','mousemove','mouseup'])
+            element.addEventListener(name, e => received.push(name));
+        }""")
+        page.wait_for_timeout(50)
+
+    def test_mobile_pointer_hidden_without_hiding_video_or_input(self):
+        for width, height in [(320,568), (768,1024)]:
+            with self.subTest(size=(width,height)):
+                page = self.page(width, height)
+                self.attach_stream_input(page)
+                for reconnect in range(2):
+                    page.evaluate("""() => {
+                      webrtcInput.cursorDiv.style.display='block';
+                      webrtcInput.element.style.setProperty('cursor','crosshair','important');
+                    }""")
+                    page.wait_for_timeout(50)
+                    self.assertEqual(page.evaluate('getComputedStyle(webrtcInput.cursorDiv).visibility'), 'hidden')
+                    self.assertEqual(page.locator('#overlayInput').evaluate('e => getComputedStyle(e).cursor'), 'none')
+                    self.assertTrue(page.locator('#videoCanvas').is_visible())
+                    page.touchscreen.tap(100,100)
+                    page.mouse.move(100,300)
+                    page.mouse.down()
+                    page.mouse.move(100,150,steps=8)
+                    page.mouse.up()
+                    events = page.evaluate('received')
+                    self.assertIn('touchstart',events)
+                    self.assertIn('touchend',events)
+                    self.assertIn('mousedown',events)
+                    self.assertIn('mouseup',events)
+                    self.assertGreaterEqual(events.count('mousemove'),8)
+                    if reconnect == 0:
+                        self.attach_stream_input(page)
+                box=page.locator('.virtual-keyboard-button').bounding_box()
+                self.assertGreaterEqual(box['width'],52)
+                self.assertGreaterEqual(box['height'],52)
+
+    def test_desktop_and_shared_cursor_preserved(self):
+        for touch, hash in [(False,''), (True,'#shared'), (True,'#player2')]:
+            with self.subTest(touch=touch, hash=hash):
+                page=self.page(768,1024,touch=touch,hash=hash)
+                self.attach_stream_input(page)
+                self.assertEqual(page.evaluate('getComputedStyle(webrtcInput.cursorDiv).visibility'),'visible')
+                self.assertEqual(page.locator('#overlayInput').evaluate('e => getComputedStyle(e).cursor'),'crosshair')
+
+    def test_pointer_restored_when_switching_to_mouse(self):
+        page=self.page(430,932)
+        self.attach_stream_input(page)
+        self.assertEqual(page.evaluate('getComputedStyle(webrtcInput.cursorDiv).visibility'),'hidden')
+        session=page.context.new_cdp_session(page)
+        session.send('Emulation.setTouchEmulationEnabled',{'enabled':False})
+        page.wait_for_timeout(250)
+        self.assertEqual(page.evaluate('getComputedStyle(webrtcInput.cursorDiv).visibility'),'visible')
+        self.assertEqual(page.locator('#overlayInput').evaluate('e => getComputedStyle(e).cursor'),'crosshair')
 
     def test_fixed_server_policy(self):
         page = self.page(430,932)
