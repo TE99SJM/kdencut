@@ -85,6 +85,7 @@ list(APPEND kdenlive_SRCS
     kdencut/mobileworkspace.cpp
     kdencut/mobilesettings.cpp
     kdencut/mediaimportbridge.cpp
+    kdencut/osmo360import.cpp
     kdencut/mediaprojectusage.cpp
     kdencut/runtimefeatures.cpp
     kdencut/mainwindowtouch.cpp

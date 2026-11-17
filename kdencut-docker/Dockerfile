@@ -32,7 +32,7 @@ RUN \
     breeze breeze-icon-theme qt6-svg-plugins qt6-image-formats-plugins \
     qml6-module-org-kde-desktop qml6-module-qtquick-shapes qml6-module-qtqml-models \
     qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window \
-    libkf6i18nqml6 kded6 fonts-noto-core ffmpeg mediainfo \
+    libkf6i18nqml6 kded6 fonts-noto-core ffmpeg mediainfo python3-tk python3-numpy python3-pil \
     mesa-va-drivers intel-media-va-driver vainfo libvidstab-dev libopencv-dev zlib1g-dev libarchive-dev && \
   rm -rf /var/lib/apt/lists/*
 

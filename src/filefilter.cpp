@@ -95,6 +95,8 @@ static void initFilterDb() {
     };
     // clang-format on
 
+    supported_file_exts[Video] << qsl("*.osv") << qsl("*.OSV") << qsl("*.k360");
+
     // init file_exts
     QMimeDatabase mimedb;
 

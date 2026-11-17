@@ -128,3 +128,6 @@ uploads and a real SMB share, and checks packaged MLT services and offline Whisp
 Most phone integration is isolated under `src/kdencut/`; `mainwindow.cpp` retains
 small lifecycle/dock hooks to make later upstream merges easier.
 
+## DJI Osmo 360
+
+Open an original `.OSV` with **Add Clip** to launch the [Osmo 360 editor](data/scripts/osmo360/README.md). Drag to reframe, set camera keyframes and render a flat or interactive 360° clip back into KdenCut. Choose **Save edit** to keep a camera track you can reopen.

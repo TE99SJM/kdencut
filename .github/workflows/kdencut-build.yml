@@ -2,13 +2,15 @@ name: KdenCut container build
 
 on:
   push:
-    branches: [kdencut-touch-capcut, kdencut-mobile-layout, kdencut-device-nas-import, kdencut-phone-completion]
+    branches: [kdencut-touch-capcut, kdencut-mobile-layout, kdencut-device-nas-import, kdencut-phone-completion, kdencut-360]
     paths:
       - 'src/**'
       - 'kdencut-docker/**'
       - 'CMakeLists.txt'
       - 'data/profiles.xml'
       - 'data/scripts/whisper/**'
+      - 'data/scripts/osmo360/**'
+      - 'data/scripts/CMakeLists.txt'
       - 'KDENCUT.md'
       - '.qmllint.ini'
       - '.github/workflows/kdencut-build.yml'
@@ -44,6 +46,16 @@ jobs:
         run: python3 kdencut-docker/tests/test_media_container.py
       - name: Check packaged effects and offline Whisper captions
         run: docker run --rm --entrypoint python3 -v "$PWD:/src:ro" kdencut-ci /src/kdencut-docker/tests/check_packaged_features.py
+  osmo360:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test Osmo 360 editing and export
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg python3-numpy python3-pil python3-tk
+          /usr/bin/python3 kdencut-docker/tests/test_osmo360.py
+
   media:
     runs-on: ubuntu-24.04
     timeout-minutes: 15

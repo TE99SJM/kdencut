@@ -9,6 +9,7 @@
 #include "doc/kdenlivedoc.h"
 #include "filefilter.h"
 #include "kdenlivesettings.h"
+#include "kdencut/osmo360import.h"
 #include "klocalizedstring.h"
 #include "macros.hpp"
 #include "mainwindow.h"
@@ -608,6 +609,14 @@ const QString ClipCreator::createClipsFromList(const QList<QUrl> &list, bool che
                     }
                 }
                 checkedDirectories << fileDir;
+            }
+            const auto suffix = info.suffix().toLower();
+            if (suffix == QStringLiteral("osv") || suffix == QStringLiteral("k360")) {
+                const QString prepared = KdenCut::prepareOsmo360Clip(info.absoluteFilePath(), QApplication::activeWindow());
+                if (prepared.isEmpty()) {
+                    continue;
+                }
+                info.setFile(prepared);
             }
             std::function<void(const QString &)> callBack = [readyCallBack](const QString &binId) {
                 if (readyCallBack) {
