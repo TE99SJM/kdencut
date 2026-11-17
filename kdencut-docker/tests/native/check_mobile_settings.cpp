@@ -6,6 +6,7 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFile>
+#include <QImageReader>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QLabel>
@@ -257,6 +258,7 @@ private Q_SLOTS:
             }
             return pixels > 4;
         };
+        QVERIFY2(QImageReader(QStringLiteral(":/kdencut/controls/increase.svg")).canRead(), "The SVG image plugin must be available");
         const QImage rendered = spin.grab().toImage();
         QVERIFY(hasSymbol(rendered.copy(up)));
         QVERIFY(hasSymbol(rendered.copy(down)));

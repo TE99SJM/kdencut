@@ -35,7 +35,7 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends cmake g++ make qt6-base-dev libqt6svg6 libkf6kio-dev libkf6completion-dev libkf6itemviews-dev libkf6widgetsaddons-dev
+          apt-get install -y --no-install-recommends cmake g++ make qt6-base-dev qt6-svg-plugins libkf6kio-dev libkf6completion-dev libkf6itemviews-dev libkf6widgetsaddons-dev
       - name: Check touch settings before compiling the editor
         run: |
           cmake -S kdencut-docker/tests/settings -B /tmp/settings-checks

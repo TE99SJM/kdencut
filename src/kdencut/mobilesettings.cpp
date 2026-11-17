@@ -175,6 +175,11 @@ void stackWidget(QWidget *widget)
 {
     if (qobject_cast<QDialogButtonBox *>(widget)) return;
     widget->setMinimumWidth(0);
+    // Desktop profile containers and spin boxes can treat their preferred width
+    // as a minimum. Allow the minimum hint instead, including long unit suffixes.
+    auto policy = widget->sizePolicy();
+    policy.setHorizontalPolicy(QSizePolicy::Preferred);
+    widget->setSizePolicy(policy);
     if (auto *combo = qobject_cast<QComboBox *>(widget)) { fitCombo(combo); return; }
     if (auto *label = qobject_cast<QLabel *>(widget)) { label->setWordWrap(true); return; }
     if (auto *button = qobject_cast<QAbstractButton *>(widget)) {
@@ -218,11 +223,6 @@ void stackWidget(QWidget *widget)
         for (int i = 0; i < splitter->count(); ++i) stackWidget(splitter->widget(i));
         return;
     }
-    // ProfileWidget uses MinimumExpanding on desktop, which turns its wide
-    // preferred preview size into a minimum even after its layout is stacked.
-    auto policy = widget->sizePolicy();
-    policy.setHorizontalPolicy(QSizePolicy::Preferred);
-    widget->setSizePolicy(policy);
     stackLayout(widget->layout());
     if (auto *box = qobject_cast<QGroupBox *>(widget); box && !box->isCheckable() && !box->title().isEmpty()) {
         // A group-box title cannot wrap, but its replacement label can.
