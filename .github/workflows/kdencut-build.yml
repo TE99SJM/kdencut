@@ -22,7 +22,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  settings:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install the production Qt and KDE widget versions
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends cmake g++ make qt6-base-dev libqt6svg6 libkf6kio-dev libkf6completion-dev libkf6itemviews-dev libkf6widgetsaddons-dev
+      - name: Check touch settings before compiling the editor
+        run: |
+          cmake -S kdencut-docker/tests/settings -B /tmp/settings-checks
+          cmake --build /tmp/settings-checks -j 2
+          ctest --test-dir /tmp/settings-checks --output-on-failure
   build:
+    needs: settings
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:

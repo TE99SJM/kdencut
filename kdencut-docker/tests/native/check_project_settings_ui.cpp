@@ -33,7 +33,15 @@ private Q_SLOTS:
             const auto areas = ui.tabWidget->currentWidget()->findChildren<QScrollArea *>();
             QVERIFY(!areas.isEmpty());
             for (auto *area : areas) {
-                if (area->isVisible()) QCOMPARE(area->horizontalScrollBar()->maximum(), 0);
+                if (area->isVisible()) {
+                    if (area->horizontalScrollBar()->maximum() > 0) {
+                        qWarning() << "Section" << sections->currentText() << "viewport" << area->viewport()->size();
+                        for (QWidget *child : area->widget()->findChildren<QWidget *>()) {
+                            if (!child->isHidden()) qWarning() << child->metaObject()->className() << child->objectName() << child->size() << child->minimumSizeHint() << child->sizeHint();
+                        }
+                    }
+                    QCOMPARE(area->horizontalScrollBar()->maximum(), 0);
+                }
             }
             for (auto *button : ui.buttonBox->buttons()) {
                 QVERIFY(dialog.rect().contains(QRect(button->mapTo(&dialog, QPoint()), button->size())));
