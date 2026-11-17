@@ -22,6 +22,7 @@
 #include <QTabBar>
 #include <QTabWidget>
 #include <QTreeView>
+#include <QTextEdit>
 #include <QVBoxLayout>
 #include <QtTest>
 
@@ -77,7 +78,11 @@ private Q_SLOTS:
         connect(custom, &QRadioButton::toggled, path, &QWidget::setEnabled);
         auto *profiles = new QGroupBox(QStringLiteral("Select the profile (preset) of the project"));
         profiles->setObjectName(QStringLiteral("profile_box"));
-        auto *profileLayout = new QVBoxLayout(profiles);
+        auto *profileRoot = new QVBoxLayout(profiles);
+        auto *profileWidget = new QWidget;
+        profileWidget->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Preferred);
+        profileRoot->addWidget(profileWidget);
+        auto *profileLayout = new QVBoxLayout(profileWidget);
         auto *splitter = new QSplitter;
         profileLayout->addWidget(splitter);
         auto *tree = new QTreeView;
@@ -94,7 +99,13 @@ private Q_SLOTS:
         const auto portrait = proxy.index(0, 0, proxy.index(0, 0));
         tree->setCurrentIndex(portrait);
         splitter->addWidget(tree);
-        splitter->addWidget(new QLabel(QStringLiteral("Profile preview")));
+        auto *details = new QWidget;
+        auto *detailsLayout = new QVBoxLayout(details);
+        detailsLayout->addWidget(new QLabel(QStringLiteral("Profile preview")));
+        auto *description = new QTextEdit(QStringLiteral("1080p profile description"));
+        description->setReadOnly(true);
+        detailsLayout->addWidget(description);
+        splitter->addWidget(details);
         form->addRow(profiles);
         for (int i = 0; i < 8; ++i) form->addRow(QStringLiteral("Setting %1").arg(i), new QSpinBox);
         tabs->addTab(page, QStringLiteral("Settings"));

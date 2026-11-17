@@ -218,6 +218,11 @@ void stackWidget(QWidget *widget)
         for (int i = 0; i < splitter->count(); ++i) stackWidget(splitter->widget(i));
         return;
     }
+    // ProfileWidget uses MinimumExpanding on desktop, which turns its wide
+    // preferred preview size into a minimum even after its layout is stacked.
+    auto policy = widget->sizePolicy();
+    policy.setHorizontalPolicy(QSizePolicy::Preferred);
+    widget->setSizePolicy(policy);
     stackLayout(widget->layout());
     if (auto *box = qobject_cast<QGroupBox *>(widget); box && !box->isCheckable() && !box->title().isEmpty()) {
         // A group-box title cannot wrap, but its replacement label can.
