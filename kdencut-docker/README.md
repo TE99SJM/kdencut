@@ -50,8 +50,11 @@ settings, projects or media. Keep any existing local Compose overrides/mounts.
 Reload the browser page after rebuilding; browser assets have versioned URLs.
 A build alone does not replace the running container.
 
-If using the generated GPU override below, use both `-f` files for every Compose
-build/up/down command. To roll back the code, switch to `kdencut-touch-capcut`,
+If using the generated GPU override below, include the base file, any existing
+local override, and the GPU file with `-f` for every Compose build/up/down command.
+For example, if `compose.override.yaml` holds your NAS mounts, keep it between
+`-f compose.yaml` and `-f compose.gpu.generated.yaml`; explicit file lists otherwise omit it.
+To roll back the code, switch to `kdencut-touch-capcut`,
 rebuild and recreate using the same volumes. Back up project files before testing
 new upstream versions; returning to older code does not undo saved project edits.
 
@@ -68,10 +71,21 @@ trim. Browser input is mouse-compatible; use zoom buttons in the streamed editor
 Native touchscreen pinch stays safe even with an empty timeline. Secondary panels
 and large desktop dialogs scroll within the phone viewport. The keyboard button
 has its own bottom strip; rotation and the software keyboard resize the stream.
-Administrator-pinned display settings are respected.
+Administrator-pinned display settings are respected. Phone and tablet browsers hide
+the separate streaming mouse pointer without changing taps or drags, including
+when the session reconnects. Desktop browsers retain their cursor behavior.
+
+Project Settings uses dropdowns for its section, project preset and project-folder
+choice. Fields stack vertically, including proxy settings. Swipe up/down to scroll;
+OK and Cancel remain visible below the page. Existing dropdowns still control frame
+rate, scanning, codecs and audio channels. Buttons have larger touch targets, and
+numeric +/- controls sit beside each other instead of tiny stacked arrows. Lists
+and read-only panels use smooth scrolling with momentum; editable text, clip
+reordering and timeline trimming retain their editing gestures.
 
 Home > Desktop controls restores the desktop docks. View > Touch Mode returns to
-the phone layout. View > Show Mouse Cursor reveals the normally hidden pointer.
+the phone layout. In a desktop browser, View > Show Mouse Cursor reveals the native
+editor pointer. The phone/tablet browser continues to hide its streaming pointer.
 Settings > Color Theme supports both dark and light palettes, including inputs.
 
 **Export > TikTok / Reels / Shorts** starts a 1080×1920 progressive H.264/AAC MP4
@@ -267,3 +281,4 @@ and each social export (including sound and downloaded playback). Test a light
 color theme. Review/restore an eligible unused import and verify a referenced one
 is protected. Check GPU status and a short export on each host you intend to use;
 CI does not have your GPU, iOS photo library or NAS.
+

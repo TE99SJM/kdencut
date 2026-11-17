@@ -40,7 +40,13 @@ continuing the current edit. Home > Desktop controls restores the desktop layout
 The browser translates touches to mouse input. Use the phone workspace's swipe,
 trim and zoom buttons; native two-finger timeline gestures also work on a directly
 attached touchscreen. Pinching an empty native timeline now keeps a finite zoom.
-Large legacy dialogs scroll to keep their buttons reachable on narrow screens.
+Project Settings uses a section dropdown and vertically stacked fields. Project
+presets and the project-folder choice also use dropdowns; existing frame-rate,
+scanning, audio-channel and codec selectors keep their normal behavior. OK and
+Cancel stay below the scrolling page. Swipe up/down for more settings, including
+proxy controls. The phone tool buttons and keyboard button have larger targets;
+numeric fields have separate full-height increase/decrease buttons.
+Other large legacy dialogs scroll to keep their buttons reachable on narrow screens.
 
 ## Media, uploads and NAS
 
@@ -73,8 +79,10 @@ now use palette colors, including when switching between dark and light themes.
 Phone labels use KDE's `i18n()`/gettext system; new strings require translated
 catalog entries before they appear in a particular language.
 
-The pointer is hidden by default. Use View > Show Mouse Cursor, or launch
-`kdenlive --show-cursor`. View > Touch Mode switches workspaces and remembers the
+The phone/tablet browser hides both the native cursor and Selkies’ separate mouse
+pointer layer, including after reconnecting. Touch input remains active. Desktop
+browsers keep their cursor behavior; use View > Show Mouse Cursor, or launch
+`kdenlive --show-cursor` for the native editor. View > Touch Mode switches workspaces and remembers the
 choice. Project saves preserve the desktop layout for later use.
 
 ## Docker capabilities
@@ -107,6 +115,7 @@ uploads and a real SMB share, and checks packaged MLT services and offline Whisp
 | Location | Purpose |
 | --- | --- |
 | `src/kdencut/mobileworkspace.cpp` | Responsive phone layout, tools and translated labels |
+| `src/kdencut/mobilesettings.cpp`, `touchscrolling.h` | Vertical settings, dropdown adapters and kinetic scrolling |
 | `src/kdencut/mainwindowtouch.cpp` | Dock ownership, lifecycle connections and phone commands |
 | `src/kdencut/mobileediting.cpp`, `mobileexport.cpp`, `phonepresets.h` | Volume, canvas ratios and social export integration |
 | `src/kdencut/touchmode.cpp`, `palettewatcher.h`, `kdencut-touch.qss` | Touch behavior, cursor and palette-aware styling |
@@ -118,3 +127,4 @@ uploads and a real SMB share, and checks packaged MLT services and offline Whisp
 
 Most phone integration is isolated under `src/kdencut/`; `mainwindow.cpp` retains
 small lifecycle/dock hooks to make later upstream merges easier.
+
