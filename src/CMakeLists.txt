@@ -214,7 +214,7 @@ ecm_target_qml_sources(kdenliveLib
     dialogs/Simplesplash.qml
 )
 
-qt_add_resources(kdenlive_extra_SRCS icons.qrc uiresources.qrc)
+qt_add_resources(kdenlive_extra_SRCS icons.qrc uiresources.qrc kdencut/controls.qrc)
 
 ## Icon for Windows and MacOS.
 ## The svg (or svgz) icon must be provided first to be used on MacOS

@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QLineEdit>
 #include <QSpinBox>
+#include <QPushButton>
 #include <QVBoxLayout>
 #include <QtTest>
 #include "../../../src/kdencut/palettewatcher.h"
@@ -26,16 +27,22 @@ private Q_SLOTS:
         combo->addItem(QStringLiteral("1080p"));
         for (auto *input : {static_cast<QWidget *>(line), static_cast<QWidget *>(spin), static_cast<QWidget *>(combo)}) layout->addWidget(input);
         qApp->setStyleSheet(QString::fromUtf8(file.readAll()));
-        window.resize(390, 240);
+        auto *button = new QPushButton(QStringLiteral("Cancel"));
+        layout->addWidget(button);
+        window.resize(390, 320);
         window.show();
         for (bool light : {true, false, true}) {
             QPalette palette;
             palette.setColor(QPalette::Base, light ? QColor("#fafafa") : QColor("#121212"));
             palette.setColor(QPalette::Text, light ? QColor("#121212") : QColor("#fafafa"));
+            palette.setColor(QPalette::Button, light ? QColor("#dddddd") : QColor("#26262b"));
+            palette.setColor(QPalette::ButtonText, light ? QColor("#121212") : QColor("#fafafa"));
             palette.setColor(QPalette::Highlight, QColor("#00838c"));
             palette.setColor(QPalette::HighlightedText, Qt::white);
             qApp->setPalette(palette);
             QTest::qWait(10);
+            QCOMPARE(button->palette().color(QPalette::ButtonText), palette.color(QPalette::ButtonText));
+            QCOMPARE(button->grab().toImage().pixelColor(button->width() / 2, button->height() - 5), palette.color(QPalette::Button));
             for (auto *input : {static_cast<QWidget *>(line), static_cast<QWidget *>(spin), static_cast<QWidget *>(combo)}) {
                 QCOMPARE(input->palette().color(QPalette::Base), palette.color(QPalette::Base));
                 QCOMPARE(input->palette().color(QPalette::Text), palette.color(QPalette::Text));

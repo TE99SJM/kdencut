@@ -7,12 +7,14 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
+#include <QFontInfo>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPersistentModelIndex>
 #include <QRadioButton>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSplitter>
@@ -241,6 +243,9 @@ bool KdenCut::adaptProjectSettings(QDialog *dialog, const QRect &available)
     if (!tabs || !buttons) return false;
     if (!dialog->property("kdencutVerticalSettings").toBool()) {
         dialog->setProperty("kdencutVerticalSettings", true);
+        QFont font = dialog->font();
+        font.setPixelSize(qMax(14, QFontInfo(font).pixelSize()));
+        dialog->setFont(font);
         if (auto *profiles = dialog->findChild<QGroupBox *>(QStringLiteral("profile_box"))) presetDropdown(profiles);
         folderDropdown(dialog);
         for (int i = 0; i < tabs->count(); ++i) {
@@ -248,7 +253,7 @@ bool KdenCut::adaptProjectSettings(QDialog *dialog, const QRect &available)
             stackWidget(page);
             if (!page->findChild<QScrollArea *>()) {
                 auto *body = new QWidget;
-                body->setLayout(page->layout());
+                if (page->layout()) body->setLayout(page->layout());
                 auto *scroll = new QScrollArea;
                 scroll->setWidgetResizable(true);
                 scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -282,9 +287,13 @@ bool KdenCut::adaptProjectSettings(QDialog *dialog, const QRect &available)
         layout->addWidget(tabs, 1);
         layout->addWidget(buttons);
         buttons->setOrientation(Qt::Vertical);
+        for (QAbstractButton *button : buttons->buttons()) {
+            button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+            buttons->layout()->setAlignment(button, Qt::Alignment());
+        }
     }
     dialog->setMinimumSize(0, 0);
-    dialog->resize(qMax(240, available.width() - 16), qMax(200, available.height() - 40));
+    dialog->resize(qBound(240, available.width() - 16, 640), qMax(200, available.height() - 40));
     dialog->move(available.center() - QPoint(dialog->width() / 2, dialog->height() / 2));
     return true;
 }

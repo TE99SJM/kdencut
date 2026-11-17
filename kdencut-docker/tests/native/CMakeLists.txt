@@ -52,3 +52,9 @@ target_link_libraries(check_project_settings_ui PRIVATE Qt6::Widgets Qt6::Test K
 target_compile_definitions(check_project_settings_ui PRIVATE KDENCUT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../..")
 add_test(NAME project_settings_ui COMMAND check_project_settings_ui)
 set_tests_properties(project_settings_ui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+set(CMAKE_AUTORCC ON)
+foreach(target check_touch_theme check_mobile_settings check_project_settings_ui)
+    set_target_properties(${target} PROPERTIES AUTORCC ON)
+    target_sources(${target} PRIVATE ../../../src/kdencut/controls.qrc)
+endforeach()

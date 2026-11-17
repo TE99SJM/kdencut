@@ -41,6 +41,7 @@ private Q_SLOTS:
         QTest::newRow("small phone") << QSize(320, 568);
         QTest::newRow("phone") << QSize(430, 932);
         QTest::newRow("tablet") << QSize(768, 1024);
+        QTest::newRow("landscape tablet") << QSize(1366, 1024);
     }
     void portraitSettings()
     {
@@ -149,6 +150,15 @@ private Q_SLOTS:
             QVERIFY(button->height() >= 48);
             QVERIFY(dialog.rect().contains(QRect(button->mapTo(&dialog, QPoint()), button->size())));
         }
+        // Keep the actions reachable through rotation and keyboard resizing.
+        for (const QSize size : {QSize(932, 430), QSize(430, 344), screen}) {
+            QVERIFY(KdenCut::adaptProjectSettings(&dialog, QRect(QPoint(), size)));
+            QTest::qWait(20);
+            QVERIFY(dialog.width() <= size.width() && dialog.height() <= size.height());
+            for (auto *button : buttons->buttons()) {
+                QVERIFY(dialog.rect().contains(QRect(button->mapTo(&dialog, QPoint()), button->size())));
+            }
+        }
         QSignalSpy rejected(&dialog, &QDialog::rejected);
         QTest::mouseClick(buttons->button(QDialogButtonBox::Cancel), Qt::LeftButton);
         QCOMPARE(rejected.count(), 1);
@@ -213,6 +223,27 @@ private Q_SLOTS:
         QVERIFY(up.width() >= 44 && up.height() >= 44);
         QVERIFY(down.width() >= 44 && down.height() >= 44);
         QVERIFY2(!up.intersects(down), qPrintable(QStringLiteral("up %1,%2 down %3,%4").arg(up.x()).arg(up.width()).arg(down.x()).arg(down.width())));
+        const auto hasSymbol = [](const QImage &image) {
+            int pixels = 0;
+            for (int y = 0; y < image.height(); ++y) for (int x = 0; x < image.width(); ++x) {
+                const QColor color = image.pixelColor(x, y);
+                if (qAbs(color.red() - 128) < 8 && qAbs(color.green() - 128) < 8 && qAbs(color.blue() - 128) < 8) ++pixels;
+            }
+            return pixels > 4;
+        };
+        const QImage rendered = spin.grab().toImage();
+        QVERIFY(hasSymbol(rendered.copy(up)));
+        QVERIFY(hasSymbol(rendered.copy(down)));
+        QComboBox combo;
+        combo.addItem(QStringLiteral("Project preset"));
+        combo.resize(280, 52);
+        combo.show();
+        QTest::qWait(10);
+        QStyleOptionComboBox comboOption;
+        comboOption.initFrom(&combo);
+        const QRect arrow = combo.style()->subControlRect(QStyle::CC_ComboBox, &comboOption, QStyle::SC_ComboBoxArrow, &combo);
+        QVERIFY(arrow.width() >= 44);
+        QVERIFY(hasSymbol(combo.grab().toImage().copy(arrow)));
         QTest::mouseClick(&spin, Qt::LeftButton, Qt::NoModifier, up.center());
         QCOMPARE(spin.value(), 1);
         QTest::mouseClick(&spin, Qt::LeftButton, Qt::NoModifier, down.center());

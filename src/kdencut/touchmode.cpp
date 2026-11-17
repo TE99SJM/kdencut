@@ -42,6 +42,14 @@ constexpr int touchIconSize = 28;
 constexpr int touchTrackHeight = 64;
 const char *scrollerProperty = "kdencutScroller";
 const char *iconSizeProperty = "kdencutOriginalIconSize";
+void fitTouchDialog(QDialog *dialog)
+{
+    if (!dialog || qobject_cast<QWizard *>(dialog)) return;
+    const QRect available = dialog->screen()->availableGeometry();
+    if (dialog->objectName() == QLatin1String("ProjectSettings_UI") || available.width() < 1100 || available.width() < available.height()) {
+        MobileWorkspace::fitDialog(dialog, available);
+    }
+}
 } // namespace
 
 QString TouchMode::colorSchemeId()
@@ -103,6 +111,18 @@ void TouchMode::initialize(bool forceShowCursor)
     }
 
     qApp->installEventFilter(this);
+    // Remote rotation and the phone keyboard change the server display size.
+    // Refit open dialogs as well as the main workspace after that change.
+    const auto watchScreen = [this](QScreen *screen) {
+        connect(screen, &QScreen::availableGeometryChanged, this, [this]() {
+            if (!touchEnabled()) return;
+            for (QWidget *widget : QApplication::topLevelWidgets()) {
+                if (widget->isVisible()) fitTouchDialog(qobject_cast<QDialog *>(widget));
+            }
+        });
+    };
+    for (QScreen *screen : QGuiApplication::screens()) watchScreen(screen);
+    connect(qApp, &QGuiApplication::screenAdded, this, watchScreen);
 
     if (KdenliveSettings::touchmode()) {
         applyStyleSheet();
@@ -300,10 +320,7 @@ bool TouchMode::eventFilter(QObject *watched, QEvent *event)
         if (KdenliveSettings::touchmode() && watched->isWidgetType()) {
             if (auto *dialog = qobject_cast<QDialog *>(watched); dialog && !qobject_cast<QWizard *>(dialog)) {
                 QTimer::singleShot(0, dialog, [dialog]() {
-                    const QRect available = dialog->screen()->availableGeometry();
-                    if (available.width() < 1100 || available.width() < available.height()) {
-                        MobileWorkspace::fitDialog(dialog, available);
-                    }
+                    fitTouchDialog(dialog);
                 });
             }
             if (auto *area = qobject_cast<QAbstractScrollArea *>(watched)) {

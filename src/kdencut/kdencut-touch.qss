@@ -37,7 +37,7 @@ QToolButton {
 }
 
 QToolButton:hover {
-    background: #2a2a30;
+    background: palette(midlight);
 }
 
 QToolButton:pressed,
@@ -69,17 +69,17 @@ QPushButton {
     padding: 6px 18px;
     border-radius: 10px;
     border: 1px solid #34343a;
-    background: #26262b;
+    background: palette(button);
     color: palette(button-text);
 }
 
 QPushButton:hover {
-    background: #2f2f35;
+    background: palette(midlight);
     border-color: #44444c;
 }
 
 QPushButton:pressed {
-    background: #1c1c20;
+    background: palette(mid);
 }
 
 QPushButton:default {
@@ -112,15 +112,15 @@ QTabBar::tab {
     border: none;
     border-bottom: 3px solid transparent;
     background: transparent;
-    color: #9a9aa2;
+    color: palette(window-text);
 }
 
 QTabBar::tab:hover {
-    color: #e8e8ea;
+    color: palette(text);
 }
 
 QTabBar::tab:selected {
-    color: #ffffff;
+    color: palette(window-text);
     border-bottom: 3px solid #00c1cd;
 }
 
@@ -172,7 +172,19 @@ QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
     border-left: 1px solid palette(mid);
 }
 QSpinBox::down-button, QDoubleSpinBox::down-button { right: 45px; }
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+    image: url(:/kdencut/controls/increase.svg);
+    width: 18px; height: 18px;
+}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+    image: url(:/kdencut/controls/decrease.svg);
+    width: 18px; height: 18px;
+}
 QComboBox { padding-right: 44px; }
+QComboBox::down-arrow {
+    image: url(:/kdencut/controls/dropdown.svg);
+    width: 18px; height: 18px;
+}
 QComboBox QAbstractItemView::item { min-height: 48px; }
 
 QComboBox QAbstractItemView {
@@ -210,7 +222,7 @@ QHeaderView::section {
     border: none;
     border-right: 1px solid #26262b;
     background: #18181b;
-    color: #9a9aa2;
+    color: palette(window-text);
 }
 
 /* ---------- Check boxes and radio buttons ---------- */
@@ -333,7 +345,7 @@ QMenuBar::item {
 
 QMenuBar::item:selected,
 QMenuBar::item:pressed {
-    background: #2a2a30;
+    background: palette(midlight);
 }
 
 QMenu {
@@ -376,7 +388,7 @@ QGroupBox::title {
     subcontrol-origin: margin;
     left: 12px;
     padding: 0px 4px;
-    color: #9a9aa2;
+    color: palette(window-text);
 }
 
 QToolTip {
@@ -384,7 +396,7 @@ QToolTip {
     border: 1px solid #34343a;
     border-radius: 8px;
     background: #2c2c32;
-    color: #e8e8ea;
+    color: palette(text);
 }
 
 QStatusBar {
