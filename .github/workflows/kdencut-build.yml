@@ -24,7 +24,7 @@ concurrency:
 jobs:
   settings:
     runs-on: ubuntu-latest
-    container: ubuntu:26.04
+    container: ghcr.io/linuxserver/baseimage-selkies:ubunturesolute
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
