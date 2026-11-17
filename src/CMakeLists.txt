@@ -83,6 +83,7 @@ list(APPEND kdenlive_SRCS
     powermanagementinterface.cpp
     kdencut/touchmode.cpp
     kdencut/mobileworkspace.cpp
+    kdencut/mobilesettings.cpp
     kdencut/mediaimportbridge.cpp
     kdencut/mediaprojectusage.cpp
     kdencut/runtimefeatures.cpp
@@ -397,4 +398,5 @@ add_dependencies(kdenlive all_qmllint)
 
 ecm_finalize_qml_module(kdenliveLib
     DESTINATION ${KDE_INSTALL_QMLDIR})
+
 

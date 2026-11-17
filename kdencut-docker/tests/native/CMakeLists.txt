@@ -8,6 +8,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../make_test_catalog.py ${CMAKE_CURRENT_BINARY_DIR}/translations COMMAND_ERROR_IS_FATAL ANY)
 add_executable(check_mobile_workspace
     check_mobile_workspace.cpp
+    ../../../src/kdencut/mobilesettings.cpp
     ../../../src/kdencut/mobileworkspace.cpp
     ../../../src/kdencut/mobileworkspace.h)
 target_link_libraries(check_mobile_workspace PRIVATE Qt6::Widgets Qt6::Test Qt6::QuickWidgets KF6::I18n)
@@ -34,3 +35,20 @@ add_executable(check_phone_presets check_phone_presets.cpp)
 target_link_libraries(check_phone_presets PRIVATE Qt6::Test Qt6::Xml)
 target_compile_definitions(check_phone_presets PRIVATE KDENCUT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../..")
 add_test(NAME phone_presets COMMAND check_phone_presets)
+
+add_executable(check_mobile_settings check_mobile_settings.cpp ../../../src/kdencut/mobilesettings.cpp)
+target_link_libraries(check_mobile_settings PRIVATE Qt6::Widgets Qt6::Test)
+target_compile_definitions(check_mobile_settings PRIVATE KDENCUT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../..")
+add_test(NAME mobile_settings COMMAND check_mobile_settings)
+set_tests_properties(mobile_settings PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+find_package(KF6KIO REQUIRED)
+find_package(KF6Completion REQUIRED)
+find_package(KF6ItemViews REQUIRED)
+find_package(KF6WidgetsAddons REQUIRED)
+add_executable(check_project_settings_ui check_project_settings_ui.cpp ../../../src/kdencut/mobilesettings.cpp)
+set_target_properties(check_project_settings_ui PROPERTIES AUTOUIC ON AUTOUIC_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR}/../../../src/ui")
+target_link_libraries(check_project_settings_ui PRIVATE Qt6::Widgets Qt6::Test KF6::KIOWidgets KF6::Completion KF6::ItemViews KF6::WidgetsAddons)
+target_compile_definitions(check_project_settings_ui PRIVATE KDENCUT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../..")
+add_test(NAME project_settings_ui COMMAND check_project_settings_ui)
+set_tests_properties(project_settings_ui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

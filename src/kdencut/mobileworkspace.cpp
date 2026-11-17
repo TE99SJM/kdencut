@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL */
 #include "mobileworkspace.h"
+#include "mobilesettings.h"
+#include "touchscrolling.h"
 #include <KLocalizedString>
 
 #include <QAction>
@@ -86,21 +88,16 @@ QIcon touchIcon(const QString &name)
 
 void enableSwipe(QScrollArea *area)
 {
-    area->setProperty("kdencutScroller", true);
-    QScroller::grabGesture(area->viewport(), QScroller::LeftMouseButtonGesture);
-    auto *scroller = QScroller::scroller(area->viewport());
-    auto properties = scroller->scrollerProperties();
-    properties.setScrollMetric(QScrollerProperties::FrameRate, QScrollerProperties::Fps60);
-    properties.setScrollMetric(QScrollerProperties::DecelerationFactor, 0.12);
-    properties.setScrollMetric(QScrollerProperties::HorizontalOvershootPolicy, QScrollerProperties::OvershootAlwaysOff);
-    properties.setScrollMetric(QScrollerProperties::VerticalOvershootPolicy, QScrollerProperties::OvershootAlwaysOff);
-    scroller->setScrollerProperties(properties);
+    enableSwipeScrolling(area, true);
 }
 } // namespace
 
 void MobileWorkspace::fitDialog(QDialog *dialog, const QRect &available)
 {
     if (!dialog || !dialog->layout()) {
+        return;
+    }
+    if (adaptProjectSettings(dialog, available)) {
         return;
     }
     const QSize limit(qMax(240, available.width() - 24), qMax(200, available.height() - 48));
@@ -150,7 +147,7 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
     setStyleSheet(QStringLiteral(
         "#mobileWorkspace { background: #121212; color: #eeeeee; }"
         "#mobileWorkspace QLabel { color: #eeeeee; background: transparent; }"
-        "#mobileWorkspace QToolButton { min-width: 40px; min-height: 40px; padding: 2px 4px; border: 0; border-radius: 7px; background: transparent; color: #eeeeee; }"
+        "#mobileWorkspace QToolButton { min-width: 48px; min-height: 48px; padding: 2px 4px; border: 0; border-radius: 7px; background: transparent; color: #eeeeee; }"
         "#mobileWorkspace QToolButton:pressed { background: #28474a; }"
         "#mobileWorkspace QToolButton:disabled { color: #696969; }"
         "#mobileWorkspace QToolButton#mobileExport, #mobileWorkspace QToolButton#mobileNew { background: #08bfd0; color: #071719; font-weight: bold; }"
@@ -344,12 +341,12 @@ QToolButton *MobileWorkspace::button(const QString &text, const QString &icon, c
     b->setToolTip(text);
     b->setAccessibleName(text);
     b->setIcon(touchIcon(icon));
-    b->setIconSize(QSize(24, 24));
+    b->setIconSize(QSize(28, 28));
     b->setToolButtonStyle(label ? Qt::ToolButtonTextUnderIcon : Qt::ToolButtonIconOnly);
     b->setFocusPolicy(Qt::NoFocus);
     if (label) {
         QFont labelFont = font();
-        labelFont.setPixelSize(12);
+        labelFont.setPixelSize(14);
         b->setFont(labelFont);
         b->setStyleSheet(QStringLiteral("min-width: %1px;").arg(qMax(48, b->fontMetrics().horizontalAdvance(text) + 12)));
     }
@@ -390,7 +387,7 @@ QWidget *MobileWorkspace::toolStrip(const QList<QWidget *> &buttons)
     scroll->setWidget(contents);
     // Font/style propagation happens after these controls enter the stacked
     // workspace. Reserve room for both the icon and its label before that.
-    scroll->setFixedHeight(qMax(72, contents->sizeHint().height() + 2));
+    scroll->setFixedHeight(qMax(80, contents->sizeHint().height() + 2));
     enableSwipe(scroll);
     return scroll;
 }

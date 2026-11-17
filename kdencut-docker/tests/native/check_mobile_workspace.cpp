@@ -430,6 +430,10 @@ private Q_SLOTS:
             auto *exportButton = workspace.findChild<QToolButton *>(QStringLiteral("mobileExport"));
             const QRect exportRect(exportButton->mapTo(&workspace, QPoint()), exportButton->size());
             QVERIFY(workspace.rect().contains(exportRect));
+            for (auto *button : workspace.findChildren<QToolButton *>()) {
+                if (!button->isVisible()) continue;
+                QVERIFY2(button->width() >= 48 && button->height() >= 48, qPrintable(button->objectName()));
+            }
             QVERIFY(preview->isVisible());
             QVERIFY(timeline->isVisible());
             QVERIFY(workspace.rect().contains(QRect(preview->mapTo(&workspace, QPoint()), preview->size())));

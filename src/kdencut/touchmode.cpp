@@ -4,6 +4,7 @@
 */
 
 #include "touchmode.h"
+#include "touchscrolling.h"
 #include "mobileworkspace.h"
 #include "palettewatcher.h"
 #include "runtimefeatures.h"
@@ -244,15 +245,7 @@ void TouchMode::enableTouchScrolling(QWidget *widget)
     if (!viewport) {
         return;
     }
-    area->setProperty(scrollerProperty, true);
-    QScroller::grabGesture(viewport, QScroller::TouchGesture);
-    QScroller *scroller = QScroller::scroller(viewport);
-    QScrollerProperties props = scroller->scrollerProperties();
-    props.setScrollMetric(QScrollerProperties::VerticalOvershootPolicy, QVariant::fromValue(QScrollerProperties::OvershootAlwaysOff));
-    props.setScrollMetric(QScrollerProperties::HorizontalOvershootPolicy, QVariant::fromValue(QScrollerProperties::OvershootAlwaysOff));
-    props.setScrollMetric(QScrollerProperties::DragStartDistance, 0.003);
-    props.setScrollMetric(QScrollerProperties::DecelerationFactor, 0.2);
-    scroller->setScrollerProperties(props);
+    enableSwipeScrolling(area, qEnvironmentVariableIsSet("KDENCUT_RUNTIME"));
     m_scrollViewports << viewport;
 }
 
