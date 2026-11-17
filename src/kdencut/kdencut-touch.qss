@@ -222,7 +222,7 @@ QHeaderView::section {
     border: none;
     border-right: 1px solid #26262b;
     background: #18181b;
-    color: palette(window-text);
+    color: #9a9aa2;
 }
 
 /* ---------- Check boxes and radio buttons ---------- */
@@ -396,7 +396,7 @@ QToolTip {
     border: 1px solid #34343a;
     border-radius: 8px;
     background: #2c2c32;
-    color: palette(text);
+    color: #e8e8ea;
 }
 
 QStatusBar {
