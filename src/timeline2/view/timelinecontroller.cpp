@@ -304,12 +304,18 @@ const QString TimelineController::getTrackNameFromIndex(int trackIndex)
     return trackName.isEmpty() ? m_model->getTrackTagById(trackIndex) : trackName;
 }
 
-QMap<int, QString> TimelineController::getTrackNames(bool videoOnly)
+QMap<int, QString> TimelineController::getTrackNames(bool video)
 {
     QMap<int, QString> names;
     for (const auto &track : m_model->m_iteratorTable) {
-        if (videoOnly && m_model->getTrackById_const(track.first)->isAudioTrack()) {
-            continue;
+        if (video) {
+            if (m_model->getTrackById_const(track.first)->isAudioTrack()) {
+                continue;
+            }
+        } else {
+            if (!m_model->getTrackById_const(track.first)->isAudioTrack()) {
+                continue;
+            }
         }
         QString trackName = m_model->getTrackFullName(track.first);
         names[m_model->getTrackMltIndex(track.first)] = trackName;
@@ -537,6 +543,16 @@ QList<int> TimelineController::insertClips(int tid, int position, const QStringL
     QList<int> clipIds;
     if (tid == -1) {
         tid = m_activeTrack;
+    }
+    // Subtitle selection uses -2, and a deleted track can leave a stale ID.
+    // Reject either before insertion code dereferences a TrackModel.
+    if (!m_model || !m_model->isTrack(tid)) {
+        pCore->displayMessage(i18n("No available track for insert operation"), ErrorMessage, 500);
+        return clipIds;
+    }
+    if (m_model->getTrackById_const(tid)->isLocked()) {
+        pCore->displayMessage(i18n("Cannot insert clips into a locked track"), ErrorMessage, 500);
+        return clipIds;
     }
     if (position == -1) {
         position = pCore->getMonitorPosition();

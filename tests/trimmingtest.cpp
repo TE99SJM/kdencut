@@ -526,6 +526,24 @@ TEST_CASE("Simple trimming operations", "[Trimming]")
         state2();
     }
 
+    SECTION("Undo a cut of a group while both cut parts are selected")
+    {
+        REQUIRE(timeline->requestClipMove(cid1, tid1, 10));
+        REQUIRE(timeline->requestClipMove(cid2, tid1, 40));
+        REQUIRE(timeline->requestClipMove(cid3, tid2, 0));
+        REQUIRE(timeline->requestClipMove(cid4, tid3, 30));
+        int gid = timeline->requestClipsGroup({cid1, cid2, cid3, cid4});
+        REQUIRE(gid > -1);
+        // Each cut splits the group
+        REQUIRE(TimelineFunctions::requestClipCut(timeline, cid4, 40));
+        REQUIRE(TimelineFunctions::requestClipCut(timeline, cid1, 24));
+        // Select clips from two groups resulting from the cuts
+        REQUIRE(timeline->requestSetSelection({cid1, cid2}));
+        undoStack->undo();
+        REQUIRE(timeline->checkConsistency());
+        REQUIRE(timeline->getGroupElements(cid1) == std::unordered_set<int>({cid1, cid3, cid4}));
+    }
+
     pCore->projectManager()->closeCurrentDocument(false, false);
 }
 
@@ -2036,6 +2054,67 @@ TEST_CASE("Advanced trimming operations: Ripple", "[TrimmingRipple]")
         undoStack->redo();
         stateA1();
         stateC();
+    }
+
+    SECTION("Failed ripple spacer restores the resize")
+    {
+        REQUIRE(timeline->requestClipMove(cid1, tid2, 5));
+        int l1 = timeline->getClipPlaytime(cid1);
+        REQUIRE(timeline->requestClipMove(cid2, tid2, 5 + l1));
+        int blockingComposition = -1;
+        int composition = -1;
+        REQUIRE(timeline->requestCompositionInsertion(QStringLiteral("luma"), tid2, 0, 10, nullptr, blockingComposition));
+        REQUIRE(timeline->requestCompositionInsertion(QStringLiteral("luma"), tid2, 5 + l1, 1, nullptr, composition));
+        int undoIndex = undoStack->index();
+
+        // The spacer would move the following composition into the preceding one.
+        REQUIRE(timeline->requestItemRippleResize(timeline, cid1, 1, true) == -1);
+        REQUIRE(timeline->checkConsistency());
+        REQUIRE(timeline->getClipPosition(cid1) == 5);
+        REQUIRE(timeline->getClipPlaytime(cid1) == l1);
+        REQUIRE(timeline->getClipPosition(cid2) == 5 + l1);
+        REQUIRE(timeline->getCompositionPosition(composition) == 5 + l1);
+        REQUIRE(timeline->getCompositionPosition(blockingComposition) == 0);
+        REQUIRE(undoStack->index() == undoIndex);
+    }
+
+    SECTION("Ripple resize before a one frame clip")
+    {
+        REQUIRE(timeline->requestClipMove(cid1, tid1, 5));
+        int l1 = timeline->getClipPlaytime(cid1);
+        REQUIRE(timeline->requestClipMove(cid2, tid1, 5 + l1));
+        REQUIRE(timeline->requestItemResize(cid2, 1, true, true) == 1);
+        auto originalState = [&]() {
+            REQUIRE(timeline->checkConsistency());
+            REQUIRE(timeline->getClipPosition(cid1) == 5);
+            REQUIRE(timeline->getClipPlaytime(cid1) == l1);
+            REQUIRE(timeline->getClipPosition(cid2) == 5 + l1);
+            REQUIRE(timeline->getClipPlaytime(cid2) == 1);
+        };
+        auto trimmedState = [&]() {
+            REQUIRE(timeline->checkConsistency());
+            REQUIRE(timeline->getClipPosition(cid1) == 5);
+            REQUIRE(timeline->getClipPlaytime(cid1) == 1);
+            REQUIRE(timeline->getClipPosition(cid2) == 6);
+            REQUIRE(timeline->getClipPlaytime(cid2) == 1);
+        };
+        for (bool right : {true, false}) {
+            INFO("Right edge: " << right);
+            REQUIRE(timeline->requestItemRippleResize(timeline, cid1, 1, right) == 1);
+            trimmedState();
+            undoStack->undo();
+            originalState();
+            undoStack->redo();
+            trimmedState();
+
+            // Expanding the left edge must include the now one-frame clip itself.
+            REQUIRE(timeline->requestItemRippleResize(timeline, cid1, l1, right) == l1);
+            originalState();
+            undoStack->undo();
+            trimmedState();
+            undoStack->undo();
+            originalState();
+        }
     }
 
     pCore->projectManager()->closeCurrentDocument(false, false);

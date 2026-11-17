@@ -85,6 +85,8 @@ public:
         auto parentWidget = KDDockWidgets::QtCommon::View_qt::asQWidget(parent);
         setProperty("_breeze_force_frame", false);
         setDocumentMode(true);
+        setUsesScrollButtons(true);
+        setElideMode(Qt::ElideRight);
         parentWidget->setProperty("_breeze_force_frame", false);
         setContextMenuPolicy(Qt::CustomContextMenu);
         // The constructor of KDDockWidgets::QtWidgets::TabBar makes a QProxyStyle

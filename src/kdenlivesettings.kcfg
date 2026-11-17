@@ -741,6 +741,12 @@
       <default>true</default>
     </entry>
 
+    <entry name="lowMemoryThreshold" type="Int">
+      <label>Show a warning when the free memory during rendering is below this value (in MB), 0 calculates it automatically from the render</label>
+      <default>0</default>
+      <min>0</min>
+    </entry>
+
     <entry name="lastCacheCheck" type="DateTime">
       <label>Kdenlive will check every 2 weeks on startup if the cached data exceeds the defined maxcachesize. This is the last checked date</label>
       <default></default>
@@ -1098,6 +1104,10 @@
 
     <entry name="guidesCategories" type="StringList">
       <label>The default guide categories.</label>
+      <default></default>
+    </entry>
+    <entry name="projectBinTags" type="StringList">
+      <label>The default Project Bin tag categories.</label>
       <default></default>
     </entry>
 
@@ -1466,6 +1476,22 @@
     </entry>
     </group>
   <group name="startup">
+    <entry name="touchmode" type="Bool">
+      <label>KdenCut touch mode: larger controls, swipe scrolling and pinch-to-zoom.</label>
+      <default>true</default>
+    </entry>
+    <entry name="showcursor" type="Bool">
+      <label>KdenCut: show the mouse cursor (hidden by default for touch screens).</label>
+      <default>false</default>
+    </entry>
+    <entry name="kdencutthemeversion" type="Int">
+      <label>Version of the KdenCut look that was last applied.</label>
+      <default>0</default>
+    </entry>
+    <entry name="kdencutspeechversion" type="Int">
+      <label>Version of the bundled KdenCut speech setup applied once.</label>
+      <default>0</default>
+    </entry>
     <entry name="force_breeze" type="Bool">
       <label>Force breeze icon theme for consistent look.</label>
       <default>false</default>

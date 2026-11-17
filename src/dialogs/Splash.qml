@@ -27,6 +27,10 @@ Window {
     property var horizontalFpsModel: [{value: "24000/1001", text: KI18n.i18n("23.98 fps")},
         {value: "24", text: KI18n.i18n("24 fps")}, {value: "25", text: KI18n.i18n("25 fps")}, {value: "30000/1001", text: KI18n.i18n("29.97 fps")}, {value: "30", text: KI18n.i18n("30 fps")}, {value: "50", text: KI18n.i18n("50 fps")}, {value: "60000/1001", text: KI18n.i18n("59.94 fps")}, {value: "60", text: KI18n.i18n("60 fps")}]
     property var verticalFpsModel: [{value: "25", text: KI18n.i18n("25 fps")}, {value: "30", text: KI18n.i18n("30 fps")}, {value: "60", text: KI18n.i18n("60 fps")}]
+    property bool touchEnabled: true
+    readonly property bool phoneLayout: touchEnabled
+    property bool mobileBusy: false
+    property string mobileProgress: ""
     property bool firstRun: true
     property bool crashRecovery: false
     property bool actionsEnabled: false
@@ -59,10 +63,24 @@ Window {
     color: "transparent"
     flags: Qt.Window | Qt.FramelessWindowHint
     title: "Kdenlive"
-    minimumWidth: splashContent.implicitWidth
-    minimumHeight: splashContent.implicitHeight
-    width: splashContent.implicitWidth
-    height: splashContent.implicitHeight
+    // The welcome screen must also fit a resized remote desktop / phone.
+    minimumWidth: Math.min(320, Screen.width)
+    minimumHeight: Math.min(240, Screen.height)
+    width: phoneLayout ? Screen.width : Math.min(splashContent.implicitWidth, Screen.width - 16)
+    height: phoneLayout ? Screen.height : Math.min(splashContent.implicitHeight, Screen.height - 16)
+    readonly property bool narrow: width < splash.sizeUnit * 17
+
+    function fitScreen() {
+        width = phoneLayout ? Screen.width : Math.min(splashContent.implicitWidth, Screen.width - 16)
+        height = phoneLayout ? Screen.height : Math.min(splashContent.implicitHeight, Screen.height - 16)
+        x = Math.max(0, Math.round((Screen.width - width) / 2))
+        y = Math.max(0, Math.round((Screen.height - height) / 2))
+    }
+    Connections {
+        target: splash.screen
+        function onWidthChanged() { splash.fitScreen() }
+        function onHeightChanged() { splash.fitScreen() }
+    }
 
     onClosing: function(close) {
       close.accepted = true
@@ -81,6 +99,8 @@ Window {
 
     function displayProgress(message)
     {
+        mobileProgress = message
+        mobileBusy = message.length > 0
         loadingLabel.text = message
         loadingBox.visible = message.length > 0
         recentProjects.enabled = false
@@ -104,8 +124,196 @@ Window {
         id: activePalette
     }
 
+    Control {
+        id: mobileHome
+        anchors.fill: parent
+        palette.window: "#121212"
+        palette.windowText: "#eeeeee"
+        palette.button: "#242424"
+        palette.buttonText: "#eeeeee"
+        palette.base: "#202020"
+        palette.text: "#eeeeee"
+        palette.highlight: "#08bfd0"
+        background: Rectangle { color: "#121212" }
+        visible: splash.phoneLayout && !splash.crashRecovery && !splash.wasUpgraded
+        opacity: splashContent.opacity
+        ScrollView {
+            id: mobileHomeScroll
+            anchors.fill: parent
+            contentWidth: availableWidth
+            clip: true
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            ColumnLayout {
+                width: Math.min(640, mobileHomeScroll.availableWidth)
+                x: (mobileHomeScroll.availableWidth - width) / 2
+                spacing: 18
+                Item { Layout.preferredHeight: 20 }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                    Label {
+                        text: "KdenCut"
+                        font.pixelSize: 30
+                        font.bold: true
+                        color: "#ffffff"
+                        Layout.fillWidth: true
+                    }
+                    ToolButton {
+                        text: "×"
+                        font.pixelSize: 28
+                        implicitWidth: 48
+                        implicitHeight: 48
+                        Accessible.name: KI18n.i18n("Close")
+                        onClicked: splash.close()
+                    }
+                }
+                Label {
+                    text: KI18n.i18n("Your next video starts here.")
+                    font.pixelSize: 16
+                    color: "#b9b9b9"
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                }
+                Button {
+                    id: mobileNewVideo
+                    objectName: "mobileNewVideo"
+                    text: KI18n.i18n("New video")
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                    Layout.preferredHeight: 136
+                    enabled: splash.actionsEnabled && !splash.mobileBusy
+                    contentItem: Column {
+                        spacing: 6
+                        Label {
+                            width: parent.width
+                            text: "+"
+                            font.pixelSize: 40
+                            horizontalAlignment: Text.AlignHCenter
+                            color: "#071719"
+                        }
+                        Label {
+                            width: parent.width
+                            text: mobileNewVideo.text
+                            font.pixelSize: 23
+                            font.bold: true
+                            horizontalAlignment: Text.AlignHCenter
+                            color: "#071719"
+                        }
+                    }
+                    background: Rectangle {
+                        radius: 18
+                        color: mobileNewVideo.down ? "#08a6b5" : "#08bfd0"
+                        opacity: mobileNewVideo.enabled ? 1 : 0.55
+                    }
+                    onClicked: {
+                        splash.mobileBusy = true
+                        splash.firstStart(mobileOrientation.currentIndex === 0 ? "1080x1920x709x1x1x9x16" : "1920x1080x709x1x1x16x9", "30", false, 2, 2)
+                    }
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                    Label { text: KI18n.i18n("Format"); color: "#b9b9b9" }
+                    ComboBox {
+                        id: mobileOrientation
+                        font.pixelSize: 14
+                        objectName: "mobileOrientation"
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        implicitHeight: 48
+                        model: [KI18n.i18n("Portrait · 9:16"), KI18n.i18n("Landscape · 16:9")]
+                    }
+                }
+                Button {
+                    id: mobileOpenProject
+                    font.pixelSize: 16
+                    objectName: "mobileOpenProject"
+                    text: KI18n.i18n("Open project")
+                    icon.name: "document-open"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                    implicitHeight: 52
+                    enabled: splash.actionsEnabled && !splash.mobileBusy
+                    onClicked: splash.openOtherFile()
+                }
+                Label {
+                    text: KI18n.i18n("Recent projects")
+                    font.pixelSize: 20
+                    font.bold: true
+                    color: "#ffffff"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                }
+                Repeater {
+                    model: splash.urls.length
+                    delegate: Button {
+                        id: recentMobileProject
+                        required property int index
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 20
+                        Layout.rightMargin: 20
+                        implicitHeight: 76
+                        enabled: splash.actionsEnabled && !splash.mobileBusy
+                        background: Rectangle {
+                            radius: 12
+                            color: recentMobileProject.down ? "#28474a" : "#242424"
+                        }
+                        Accessible.name: splash.fileNames[index] || ""
+                        contentItem: Column {
+                            spacing: 6
+                            Label {
+                                width: parent.width
+                                text: splash.fileNames[recentMobileProject.index] || ""
+                                font.pixelSize: 16
+                                color: "#eeeeee"
+                                elide: Text.ElideMiddle
+                            }
+                            Label {
+                                width: parent.width
+                                text: splash.fileDates[recentMobileProject.index] || ""
+                                color: "#a2a2a2"
+                                elide: Text.ElideRight
+                            }
+                        }
+                        onClicked: {
+                            splash.mobileBusy = true
+                            splash.openFile(splash.urls[index])
+                        }
+                    }
+                }
+                Label {
+                    visible: splash.urls.length === 0
+                    text: KI18n.i18n("Your saved projects will appear here.")
+                    wrapMode: Text.WordWrap
+                    color: "#a2a2a2"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                }
+                Label {
+                    visible: splash.mobileProgress.length > 0
+                    text: splash.mobileProgress
+                    wrapMode: Text.WordWrap
+                    color: "#08bfd0"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                }
+                Item { Layout.preferredHeight: 24 }
+            }
+        }
+    }
+
     Rectangle {
         id: splashContent
+        visible: !mobileHome.visible
         anchors.fill: parent
         implicitHeight: splash.crashRecovery || splash.wasUpgraded ? splash.sizeUnit * 20 : splash.sizeUnit * 18
         implicitWidth: splash.sizeUnit * 17
@@ -197,7 +405,7 @@ Window {
 
         Item {
             id: header
-            height: splashContent.height / 3
+            height: Math.min(splashContent.height / 4, splash.sizeUnit * 4)
             anchors.left: parent.left
             anchors.right: parent.right
 
@@ -471,6 +679,24 @@ Window {
                         bottomPadding: 16
                         palette.buttonText: "#ffffff"
                         icon.color: "#ffffff"
+                        // qqc2-desktop-style paints the label inside its background,
+                        // so a custom background needs an explicit content item
+                        contentItem: RowLayout {
+                            spacing: 12
+                            Item { Layout.fillWidth: true }
+                            Label {
+                                text: "+"
+                                font.pixelSize: Math.round(newProjectButton.font.pixelSize * 1.5)
+                                font.bold: true
+                                color: "#ffffff"
+                            }
+                            Label {
+                                text: newProjectButton.text
+                                font: newProjectButton.font
+                                color: "#ffffff"
+                            }
+                            Item { Layout.fillWidth: true }
+                        }
                         background: Rectangle {
                             radius: 16
                             color: !newProjectButton.enabled ? "#52666a"
@@ -818,280 +1044,314 @@ Window {
                 anchors.margins: 10
                 spacing: 10
 
-                ColumnLayout {
+                ScrollView {
+                    id: setupScroll
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.alignment: Qt.AlignTop
-                    Label {
-                        Layout.fillWidth: true
-                        textFormat: Text.StyledText
-                        horizontalAlignment: Text.AlignJustify
-                        text: KI18n.i18n("<h3>Welcome to Kdenlive Quick Setup</h3>")
-                    }
+                    contentWidth: availableWidth
+                    contentHeight: setupForm.implicitHeight
+                    clip: true
+                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
-                    Switch {
-                        id: themeSwitch
-                        enabled: !splash.crashRecovery
-                        text: KI18n.i18n("Always Use Dark Color Theme")
-                        checked: true
-                        onCheckedChanged: {
-                            splash.switchPalette(checked);
-                        }
-                    }
-
-                    Label {
-                        Layout.fillWidth: true
-                        textFormat: Text.StyledText
-                        horizontalAlignment: Text.AlignJustify
-                        wrapMode: Text.WordWrap
-                        text: KI18n.i18n("<b>Default Project Profile</b>")
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.minimumHeight: childrenRect.height + 2 * 14
-                        radius: 5
-                        color: Qt.darker(splashContent.color, 1.4)
-
-                        RowLayout {
-                            id: profileRow
-                            anchors.top: parent.top
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.margins: 14
-                            spacing: 20
-
-                            ColumnLayout {
-                                Layout.fillWidth: false
-                                // Layout.preferredWidth: horizontalFrame.implicitWidth
-
-                                Rectangle {
-                                    id: horizontalFrame
-                                    implicitHeight: buttonNext.height * 1.4
-                                    implicitWidth: horizontalFrame.implicitHeight * 16 / 9
-                                    Layout.alignment: Qt.AlignHCenter
-                                    radius: 5
-                                    property bool checked: true
-                                    property int lastIndex: -1
-                                    property int lastFpsIndex: -1
-                                    border.color: checked ? activePalette.highlight : horizontalArea.containsMouse ? activePalette.highlight : activePalette.text
-                                    border.width: checked ? 3 : horizontalArea.containsMouse ? 2 : 1
-                                    color: checked ? splashContent.color : Qt.darker(splashContent.color, 1.2)
-                                    opacity: checked ? 1 : 0.5
-
-                                    MouseArea {
-                                        id: horizontalArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            verticalFrame.lastIndex = profileCombo.currentIndex
-                                            verticalFrame.lastFpsIndex = fpsCombo.currentIndex
-                                            horizontalFrame.checked = true
-                                            verticalFrame.checked = false
-                                            if (horizontalFrame.lastIndex > -1) {
-                                                profileCombo.currentIndex = horizontalFrame.lastIndex
-                                            }
-                                            if (horizontalFrame.lastFpsIndex > -1) {
-                                                fpsCombo.currentIndex = horizontalFrame.lastFpsIndex
-                                            }
-                                        }
-                                    }
-
-                                }
-
-                                Label {
-                                    id: horizontalLabel
-                                    text: KI18n.i18n("Horizontal")
-                                    Layout.alignment: Qt.AlignHCenter
-                                    font.bold: horizontalFrame.checked
-                                }
-
-                            }
-
-                            ColumnLayout {
-                                Layout.fillWidth: false
-
-                                Rectangle {
-                                    id: verticalFrame
-                                    implicitHeight: horizontalFrame.implicitHeight
-                                    implicitWidth: verticalFrame.implicitHeight * 9 / 16
-                                    Layout.alignment: Qt.AlignHCenter
-                                    radius: 5
-                                    property bool checked: false
-                                    property int lastIndex: -1
-                                    property int lastFpsIndex: -1
-                                    border.color: checked ? activePalette.highlight : verticalArea.containsMouse ? activePalette.highlight : activePalette.text
-                                    border.width: checked ? 3 : verticalArea.containsMouse ? 2 : 1
-                                    color: checked ? splashContent.color : Qt.darker(splashContent.color, 1.2)
-                                    opacity: checked ? 1 : 0.5
-
-                                    MouseArea {
-                                        id: verticalArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            horizontalFrame.lastIndex = profileCombo.currentIndex
-                                            horizontalFrame.lastFpsIndex = fpsCombo.currentIndex
-                                            horizontalFrame.checked = false
-                                            verticalFrame.checked = true
-                                            if (verticalFrame.lastIndex > -1) {
-                                                profileCombo.currentIndex = verticalFrame.lastIndex
-                                            }
-                                            if (verticalFrame.lastFpsIndex > -1) {
-                                                fpsCombo.currentIndex = verticalFrame.lastFpsIndex
-                                            }
-                                        }
-                                    }
-
-                                }
-
-                                Label {
-                                    id: vLabel
-                                    text: KI18n.i18n("Vertical")
-                                    Layout.alignment: Qt.AlignHCenter
-                                    font.bold: verticalFrame.checked
-                                }
-
-                            }
-
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                Row {
-                                    spacing: 10
-                                    Label {
-                                        text: KI18n.i18n("Resolution")
-                                        verticalAlignment: Qt.AlignVCenter
-                                        Layout.alignment: Qt.AlignVCenter
-                                        height: profileCombo.height
-                                    }
-
-                                    ComboBox {
-                                        id: profileCombo
-                                        // profile value is: width x height x colorspace x sarNum x sarDen x darNum x darDen
-                                        model: horizontalFrame.checked ? splash.horizontalModel : splash.verticalModel
-                                        textRole: "text"
-                                        valueRole: "value"
-                                        property bool sdProfile: horizontalFrame.checked && (currentValue.startsWith("720x480x") || currentValue.startsWith("720x576x"))
-                                        Component.onCompleted: {
-                                            let index = indexOfValue("1920x1080x709x1x1x16x9");
-                                            if (index >= 0) {
-                                                currentIndex = index
-                                            }
-                                        }
-                                    }
-
-                                }
-
-                                Row {
-                                    spacing: 10
-
-                                    Label {
-                                        text: KI18n.i18n("Frame Rate")
-                                        verticalAlignment: Qt.AlignVCenter
-                                        Layout.alignment: Qt.AlignVCenter
-                                        height: profileCombo.height
-                                        enabled: fpsCombo.enabled
-                                    }
-
-                                    ComboBox {
-                                        id: fpsCombo
-                                        model: horizontalFrame.checked ? splash.horizontalFpsModel : splash.verticalFpsModel
-                                        textRole: "text"
-                                        valueRole: "value"
-                                        Component.onCompleted: {
-                                            let index = indexOfValue(splash.palFps ? "25" : horizontalFrame.checked ? "24000/1001" : "30");
-                                            if (index >= 0) {
-                                                currentIndex = index
-                                            }
-                                        }
-                                    }
-
-                                }
-
-                                Row {
-                                    spacing: 10
-                                    Switch {
-                                        id: interlacedSwitch
-                                        text: KI18n.i18n("Interlaced")
-                                        enabled: !profileCombo.sdProfile && horizontalFrame.checked
-                                    }
-
-                                }
-
-                            }
-
-                        }
-
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
+                    ColumnLayout {
+                        id: setupForm
+                        width: setupScroll.availableWidth
                         spacing: 10
                         Label {
-                            text: KI18n.i18n("Video Tracks")
-                            Layout.alignment: Qt.AlignVCenter
+                            Layout.fillWidth: true
+                            textFormat: Text.StyledText
+                            wrapMode: Text.WordWrap
+                            horizontalAlignment: Text.AlignLeft
+                            text: KI18n.i18n("<h3>Welcome to Kdenlive Quick Setup</h3>")
                         }
-                        SpinBox {
-                            id: vTracks
-                            value: 2
 
+                        Switch {
+                            id: themeSwitch
+                            Layout.fillWidth: true
+                            Layout.minimumWidth: 0
+                            contentItem: Label {
+                                text: themeSwitch.text
+                                font: themeSwitch.font
+                                leftPadding: themeSwitch.indicator.width + themeSwitch.spacing
+                                verticalAlignment: Text.AlignVCenter
+                                wrapMode: Text.WordWrap
+                            }
+                            enabled: !splash.crashRecovery
+                            text: KI18n.i18n("Always Use Dark Color Theme")
+                            checked: true
+                            onCheckedChanged: {
+                                splash.switchPalette(checked);
+                            }
                         }
+
                         Label {
-                            text: KI18n.i18n("Audio Tracks")
-                            Layout.alignment: Qt.AlignVCenter
+                            Layout.fillWidth: true
+                            textFormat: Text.StyledText
+                            horizontalAlignment: Text.AlignJustify
+                            wrapMode: Text.WordWrap
+                            text: KI18n.i18n("<b>Default Project Profile</b>")
                         }
-                        SpinBox {
-                            id: aTracks
-                            value: 2
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: profileRow.implicitHeight + 28
+                            radius: 5
+                            color: Qt.darker(splashContent.color, 1.4)
+
+                            GridLayout {
+                                id: profileRow
+                                columns: splash.narrow ? 2 : 3
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.margins: 14
+                                rowSpacing: 20
+                                columnSpacing: 20
+
+                                ColumnLayout {
+                                    Layout.fillWidth: false
+                                    // Layout.preferredWidth: horizontalFrame.implicitWidth
+
+                                    Rectangle {
+                                        id: horizontalFrame
+                                        implicitHeight: splash.sizeUnit * 1.4
+                                        implicitWidth: horizontalFrame.implicitHeight * 16 / 9
+                                        Layout.alignment: Qt.AlignHCenter
+                                        radius: 5
+                                        property bool checked: true
+                                        property int lastIndex: -1
+                                        property int lastFpsIndex: -1
+                                        border.color: checked ? activePalette.highlight : horizontalArea.containsMouse ? activePalette.highlight : activePalette.text
+                                        border.width: checked ? 3 : horizontalArea.containsMouse ? 2 : 1
+                                        color: checked ? splashContent.color : Qt.darker(splashContent.color, 1.2)
+                                        opacity: checked ? 1 : 0.5
+
+                                        MouseArea {
+                                            id: horizontalArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                verticalFrame.lastIndex = profileCombo.currentIndex
+                                                verticalFrame.lastFpsIndex = fpsCombo.currentIndex
+                                                horizontalFrame.checked = true
+                                                verticalFrame.checked = false
+                                                if (horizontalFrame.lastIndex > -1) {
+                                                    profileCombo.currentIndex = horizontalFrame.lastIndex
+                                                }
+                                                if (horizontalFrame.lastFpsIndex > -1) {
+                                                    fpsCombo.currentIndex = horizontalFrame.lastFpsIndex
+                                                }
+                                            }
+                                        }
+
+                                    }
+
+                                    Label {
+                                        id: horizontalLabel
+                                        text: KI18n.i18n("Horizontal")
+                                        Layout.alignment: Qt.AlignHCenter
+                                        font.bold: horizontalFrame.checked
+                                    }
+
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: false
+
+                                    Rectangle {
+                                        id: verticalFrame
+                                        implicitHeight: horizontalFrame.implicitHeight
+                                        implicitWidth: verticalFrame.implicitHeight * 9 / 16
+                                        Layout.alignment: Qt.AlignHCenter
+                                        radius: 5
+                                        property bool checked: false
+                                        property int lastIndex: -1
+                                        property int lastFpsIndex: -1
+                                        border.color: checked ? activePalette.highlight : verticalArea.containsMouse ? activePalette.highlight : activePalette.text
+                                        border.width: checked ? 3 : verticalArea.containsMouse ? 2 : 1
+                                        color: checked ? splashContent.color : Qt.darker(splashContent.color, 1.2)
+                                        opacity: checked ? 1 : 0.5
+
+                                        MouseArea {
+                                            id: verticalArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                horizontalFrame.lastIndex = profileCombo.currentIndex
+                                                horizontalFrame.lastFpsIndex = fpsCombo.currentIndex
+                                                horizontalFrame.checked = false
+                                                verticalFrame.checked = true
+                                                if (verticalFrame.lastIndex > -1) {
+                                                    profileCombo.currentIndex = verticalFrame.lastIndex
+                                                }
+                                                if (verticalFrame.lastFpsIndex > -1) {
+                                                    fpsCombo.currentIndex = verticalFrame.lastFpsIndex
+                                                }
+                                            }
+                                        }
+
+                                    }
+
+                                    Label {
+                                        id: vLabel
+                                        text: KI18n.i18n("Vertical")
+                                        Layout.alignment: Qt.AlignHCenter
+                                        font.bold: verticalFrame.checked
+                                    }
+
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    Layout.columnSpan: splash.narrow ? 2 : 1
+                                    Layout.minimumWidth: 0
+                                    GridLayout {
+                                        Layout.fillWidth: true
+                                        columns: splash.width < 480 ? 1 : 2
+                                        columnSpacing: 10
+                                        Label {
+                                            text: KI18n.i18n("Resolution")
+                                            verticalAlignment: Qt.AlignVCenter
+                                            Layout.alignment: Qt.AlignVCenter
+                                        }
+
+                                        ComboBox {
+                                            id: profileCombo
+                                            Layout.fillWidth: true
+                                            Layout.minimumWidth: 0
+                                            // profile value is: width x height x colorspace x sarNum x sarDen x darNum x darDen
+                                            model: horizontalFrame.checked ? splash.horizontalModel : splash.verticalModel
+                                            textRole: "text"
+                                            valueRole: "value"
+                                            property bool sdProfile: horizontalFrame.checked && (currentValue.startsWith("720x480x") || currentValue.startsWith("720x576x"))
+                                            Component.onCompleted: {
+                                                let index = indexOfValue("1920x1080x709x1x1x16x9");
+                                                if (index >= 0) {
+                                                    currentIndex = index
+                                                }
+                                            }
+                                        }
+
+                                    }
+
+                                    GridLayout {
+                                        Layout.fillWidth: true
+                                        columns: splash.width < 480 ? 1 : 2
+                                        columnSpacing: 10
+
+                                        Label {
+                                            text: KI18n.i18n("Frame Rate")
+                                            verticalAlignment: Qt.AlignVCenter
+                                            Layout.alignment: Qt.AlignVCenter
+                                            enabled: fpsCombo.enabled
+                                        }
+
+                                        ComboBox {
+                                            id: fpsCombo
+                                            Layout.fillWidth: true
+                                            Layout.minimumWidth: 0
+                                            model: horizontalFrame.checked ? splash.horizontalFpsModel : splash.verticalFpsModel
+                                            textRole: "text"
+                                            valueRole: "value"
+                                            Component.onCompleted: {
+                                                let index = indexOfValue(splash.palFps ? "25" : horizontalFrame.checked ? "24000/1001" : "30");
+                                                if (index >= 0) {
+                                                    currentIndex = index
+                                                }
+                                            }
+                                        }
+
+                                    }
+
+                                    Row {
+                                        spacing: 10
+                                        Switch {
+                                            id: interlacedSwitch
+                                            text: KI18n.i18n("Interlaced")
+                                            enabled: !profileCombo.sdProfile && horizontalFrame.checked
+                                        }
+
+                                    }
+
+                                }
+
+                            }
+
                         }
-                    }
 
-                    Label {
-                        Layout.fillWidth: true
-                        wrapMode: Text.WordWrap
-                        text: KI18n.i18n("This can always be changed later in the Settings.")
-                        font.italic: true
-                    }
-                    Rectangle {
-                        // Crash recovery
-                        visible: splash.crashRecovery
-                        Layout.fillWidth: true
-                        Layout.minimumHeight: crashRecoveryLayout.implicitHeight + radius * 2
-
-                        color: "#22FF0000"
-                        radius: 5
-
-                        RowLayout {
-                            id: crashRecoveryLayout
-                            anchors.fill: parent
-                            anchors.leftMargin: parent.radius * 2
-                            anchors.rightMargin: parent.radius * 2
+                        GridLayout {
+                            Layout.fillWidth: true
+                            columns: splash.width < 480 ? 1 : splash.narrow ? 2 : 4
+                            columnSpacing: 10
                             Label {
-                                id: restartWelcomeLabel
-                                text: KI18n.i18n("Kdenlive crashed on last start. Reset config and restart?")
+                                text: KI18n.i18n("Video Tracks")
                                 Layout.alignment: Qt.AlignVCenter
-                                wrapMode: Text.Wrap
                             }
-                            Button {
-                                id: restartWelcomeButton
-                                enabled: splash.actionsEnabled
-                                text: KI18n.i18n("Reset")
-                                icon.name: "view-refresh"
-                                Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
-                                onClicked: splash.resetConfig()
+                            SpinBox {
+                                id: vTracks
+                                value: 2
+
+                            }
+                            Label {
+                                text: KI18n.i18n("Audio Tracks")
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+                            SpinBox {
+                                id: aTracks
+                                value: 2
                             }
                         }
-                    }
 
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: KI18n.i18n("This can always be changed later in the Settings.")
+                            font.italic: true
+                        }
+                        Rectangle {
+                            // Crash recovery
+                            visible: splash.crashRecovery
+                            Layout.fillWidth: true
+                            Layout.minimumHeight: crashRecoveryLayout.implicitHeight + radius * 2
+
+                            color: "#22FF0000"
+                            radius: 5
+
+                            RowLayout {
+                                id: crashRecoveryLayout
+                                anchors.fill: parent
+                                anchors.leftMargin: parent.radius * 2
+                                anchors.rightMargin: parent.radius * 2
+                                Label {
+                                    id: restartWelcomeLabel
+                                    text: KI18n.i18n("Kdenlive crashed on last start. Reset config and restart?")
+                                    Layout.alignment: Qt.AlignVCenter
+                                    wrapMode: Text.Wrap
+                                }
+                                Button {
+                                    id: restartWelcomeButton
+                                    enabled: splash.actionsEnabled
+                                    text: KI18n.i18n("Reset")
+                                    icon.name: "view-refresh"
+                                    Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
+                                    onClicked: splash.resetConfig()
+                                }
+                            }
+                        }
+
+                    }
                 }
 
-                RowLayout {
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: splash.narrow ? 1 : 2
                     Button {
                         id: buttonHelp
+                        Layout.fillWidth: splash.narrow
                         icon.name: "help-browser"
-                        text: KI18n.i18n("Check Online Documentation")
+                        text: KI18n.i18n("Documentation")
                         enabled: splash.actionsEnabled
                         Layout.alignment: Qt.AlignLeft
                         onClicked: splash.openLink("https://docs.kdenlive.org?utm_campaign=kdenlive_inapp&utm_term=splash_documentation&utm_content=" + splash.version)
@@ -1099,6 +1359,7 @@ Window {
 
                     Button {
                         id: buttonNext
+                        Layout.fillWidth: splash.narrow
                         icon.name: "go-next"
                         text: KI18n.i18n("Start Editing")
                         enabled: splash.actionsEnabled

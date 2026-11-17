@@ -97,6 +97,8 @@ public:
     void setRenderProgress(const QString &dest, int progress = 0, int frame = 0);
     void setRenderStatus(const QString &dest, int status, const QString &error);
     void setRenderProfile(const QMap<QString, QString> &props);
+    /** Start a portrait social export using the validated KdenCut encoder. */
+    void startMobileExport(const QString &platform);
     void saveRenderProfile();
     void updateDocumentPath();
     int waitingJobsCount() const;
@@ -185,6 +187,9 @@ private Q_SLOTS:
     /** @brief Prepare the render request. */
     void slotPrepareExport2(bool scriptExport = false);
     void slotCheckFreeMemory();
+    /** @brief Update the low memory thresholds, either from the user defined value or, in automatic mode, from an estimate of the memory needed to
+     * render frames of @p frameSize with @p threads. */
+    void updateMemoryThresholds(const QSize &frameSize, int threads);
     void updatePowerManagement();
     void checkDriveSpace();
     /** @brief Warn when the One Field deinterlacer is selected and the current sequence contains interlaced clips. */

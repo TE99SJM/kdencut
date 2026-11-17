@@ -81,6 +81,15 @@ list(APPEND kdenlive_SRCS
     glaxnimatelauncher.cpp
     filefilter.cpp
     powermanagementinterface.cpp
+    kdencut/touchmode.cpp
+    kdencut/mobileworkspace.cpp
+    kdencut/mobilesettings.cpp
+    kdencut/mediaimportbridge.cpp
+    kdencut/mediaprojectusage.cpp
+    kdencut/runtimefeatures.cpp
+    kdencut/mainwindowtouch.cpp
+    kdencut/mobileediting.cpp
+    kdencut/mobileexport.cpp
 )
 
 if(CRASH_AUTO_TEST)
@@ -133,6 +142,7 @@ kconfig_target_kcfg_file(kdenliveLib
     DEFAULT_VALUE_GETTERS
 )
 install(FILES kdenlivesettings.kcfg DESTINATION ${KDE_INSTALL_KCFGDIR})
+install(FILES kdencut/KdenCut.colors DESTINATION ${KDE_INSTALL_DATADIR}/color-schemes)
 
 ecm_add_qml_module(kdenliveLib
     URI org.kde.kdenlive
@@ -179,6 +189,8 @@ ecm_target_qml_sources(kdenliveLib
     monitor/view/RotationHandle.qml
     monitor/view/Utils.js
     timeline2/view/qml/Timeline.qml
+    timeline2/view/qml/TouchTimeline.qml
+    timeline2/view/qml/TouchTimelineClip.qml
     timeline2/view/qml/TimelineLogic.js
     timeline2/view/qml/TrackHead.qml
     timeline2/view/qml/SubtitleTrackHead.qml
@@ -202,7 +214,7 @@ ecm_target_qml_sources(kdenliveLib
     dialogs/Simplesplash.qml
 )
 
-qt_add_resources(kdenlive_extra_SRCS icons.qrc uiresources.qrc)
+qt_add_resources(kdenlive_extra_SRCS icons.qrc uiresources.qrc kdencut/controls.qrc)
 
 ## Icon for Windows and MacOS.
 ## The svg (or svgz) icon must be provided first to be used on MacOS
@@ -386,4 +398,5 @@ add_dependencies(kdenlive all_qmllint)
 
 ecm_finalize_qml_module(kdenliveLib
     DESTINATION ${KDE_INSTALL_QMLDIR})
+
 

@@ -15,8 +15,10 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include "ui_configcolors_ui.h"
 #include "ui_configenv_ui.h"
 #include "ui_configjogshuttle_ui.h"
+#include "ui_configmarkers_ui.h"
 #include "ui_configmisc_ui.h"
 #include "ui_configproject_ui.h"
+#include "ui_configprojectdefaults_ui.h"
 #include "ui_configproxy_ui.h"
 #include "ui_configsdl_ui.h"
 #include "ui_configtimeline_ui.h"
@@ -111,10 +113,13 @@ private:
     Ui::ConfigJogShuttle_UI m_configShuttle;
     Ui::ConfigSdl_UI m_configSdl;
     Ui::ConfigTranscode_UI m_configTranscode;
+    Ui::ConfigProjectDefaults_UI m_configProjectDefaults;
     Ui::ConfigProject_UI m_configProject;
     Ui::ConfigProxy_UI m_configProxy;
+    Ui::ConfigMarkers_UI m_configMarkers;
     PluginsSettings *m_pluginsPage;
     GuideCategories *m_guidesCategories;
+    GuideCategories *m_projectBinTagsCategories;
     ProfileWidget *m_pw;
     KProcess m_readProcess;
     bool m_modified;
@@ -140,7 +145,6 @@ private:
     bool initAudioRecDevice();
     void initMiscPage();
     void initProjectPage();
-    void initProxyPage();
     void initTimelinePage();
     void initEnviromentPage();
     void initColorsPage();

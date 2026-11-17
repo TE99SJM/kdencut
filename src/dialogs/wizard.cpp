@@ -29,6 +29,8 @@
 #include <QMimeDatabase>
 #include <QMimeType>
 #include <QPushButton>
+#include <QScrollArea>
+#include <QScreen>
 #include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QTimer>
@@ -74,8 +76,21 @@ Wizard::Wizard(bool autoClose, QWidget *parent)
     m_startLayout->addWidget(m_errorWidget);
     m_errorWidget->setCloseButtonVisible(false);
     m_errorWidget->hide();
-    m_page->setLayout(m_startLayout);
+    auto *content = new QWidget(this);
+    content->setLayout(m_startLayout);
+    auto *scroll = new QScrollArea(m_page);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setWidget(content);
+    auto *pageLayout = new QVBoxLayout(m_page);
+    pageLayout->setContentsMargins(0, 0, 0, 0);
+    pageLayout->addWidget(scroll);
     addPage(m_page);
+    QTimer::singleShot(0, this, [this]() {
+        if (screen()) {
+            resize(sizeHint().boundedTo(screen()->availableSize() - QSize(24, 48)));
+        }
+    });
 
     setButtonText(QWizard::CancelButton, i18n("Abort"));
     setButtonText(QWizard::FinishButton, i18n("OK"));
@@ -104,6 +119,7 @@ Wizard::Wizard(bool autoClose, QWidget *parent)
     }
     if (!m_errors.isEmpty() || !m_warnings.isEmpty() || (!m_infos.isEmpty())) {
         QLabel *lab = new QLabel(this);
+        lab->setWordWrap(true);
         lab->setText(i18n("Startup error or warning, check our <a href='#'>online manual</a>."));
         connect(lab, &QLabel::linkActivated, this, &Wizard::slotOpenManual);
         m_startLayout->addWidget(lab);
@@ -160,6 +176,7 @@ Wizard::Wizard(bool autoClose, QWidget *parent)
             GPULabel.append(gpu.at(1));
         }
         lab->setText(GPULabel);
+        lab->setWordWrap(true);
         lab->setMessageType(KMessageWidget::Positive);
         lab->setCloseButtonVisible(false);
         QFrame *line = new QFrame(this);

@@ -19,6 +19,7 @@ Rectangle {
     id: trackHeadRoot
     required property K.TimelineController timeline
     required property K.TimelineItemModel controller
+    property bool mobileLayout: false
     required property string trackName
     required property string effectNames
     required property bool isStackEnabled
@@ -115,7 +116,7 @@ Rectangle {
         height: trackHeadRoot.height
         verticalAlignment: Text.AlignTop
         horizontalAlignment: Text.AlignHCenter
-        visible: trackHeadRoot.isAudio ? trackHeadRoot.timeline.hasAudioTarget > 0 : trackHeadRoot.timeline.hasVideoTarget
+        visible: !trackHeadRoot.mobileLayout && (trackHeadRoot.isAudio ? trackHeadRoot.timeline.hasAudioTarget > 0 : trackHeadRoot.timeline.hasVideoTarget)
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.margins: 1
@@ -210,8 +211,20 @@ Rectangle {
         }
     ]
     }
+    ToolButton {
+        visible: trackHeadRoot.mobileLayout
+        anchors.fill: parent
+        text: trackHeadRoot.trackTag
+        icon.name: trackHeadRoot.isLocked ? "object-locked" : (trackHeadRoot.isAudio ? "audio-x-generic" : "video-x-generic")
+        display: AbstractButton.TextUnderIcon
+        onClicked: {
+            trackHeadRoot.timeline.activeTrack = trackHeadRoot.trackId
+            trackHeadRoot.showHeaderMenu()
+        }
+    }
     Item {
         id: trackHeadColumn
+        visible: !trackHeadRoot.mobileLayout
         anchors.fill: parent
         anchors.leftMargin: trackTarget.width
         anchors.topMargin: 0
@@ -227,7 +240,7 @@ Rectangle {
                     trackHeadRoot.timeline.collapseAllTrackHeight(trackHeadRoot.trackId, !trackHeadRoot.collapsed, trackHeadRoot.collapsedHeight)
                 } else {
                     if (trackHeadRoot.collapsed) {
-                        var newHeight = Math.max(trackHeadRoot.collapsedHeight * 1.5, trackHeadRoot.controller.getTrackProperty(trackHeadRoot.trackId, "kdenlive:trackheight"))
+                        const newHeight = Math.max(trackHeadRoot.collapsedHeight * 1.5, trackHeadRoot.controller.getTrackProperty(trackHeadRoot.trackId, "kdenlive:trackheight"))
                         trackHeadRoot.controller.setTrackProperty(trackHeadRoot.trackId, "kdenlive:trackheight", newHeight)
                         trackHeadRoot.controller.setTrackProperty(trackHeadRoot.trackId, "kdenlive:collapsed", "0")
                     } else {
@@ -585,7 +598,7 @@ Rectangle {
                         if (!dragStarted && Math.abs(mapToItem(null, x, y).y - startY) > 2) {
                             dragStarted = true
                         }
-                        var newHeight = Math.round(originalY + (mapToItem(null, x, y).y - startY))
+                        let newHeight = Math.round(originalY + (mapToItem(null, x, y).y - startY))
                         newHeight =  Math.max(trackHeadRoot.collapsedHeight, newHeight)
                         if (newHeight == trackHeadRoot.collapsedHeight) {
                             trackHeadRoot.controller.setTrackProperty(trackHeadRoot.trackId, "kdenlive:collapsed", trackHeadRoot.collapsedHeight)

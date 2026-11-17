@@ -11,6 +11,7 @@
 #include <QFileInfo>
 
 #include <KColorSchemeManager>
+#include "kdencut/touchmode.h"
 #include <KColorSchemeModel>
 #include <KLocalizedQmlContext>
 #include <KLocalizedString>
@@ -48,6 +49,7 @@ Splash::Splash(const QString version, const QStringList urls, const QStringList 
     if (showWelcome) {
         bool isPalFps = ProjectManager::getDefaultProjectFormat().endsWith(QLatin1String("_25"));
         m_engine->setInitialProperties({{"version", version},
+                                        {"touchEnabled", KdenliveSettings::touchmode()},
                                         {"fileNames", fileNames},
                                         {"fileDates", fileDates},
                                         {"urls", urls},
@@ -149,7 +151,7 @@ void Splash::setReady()
 
 void Splash::switchPalette(bool dark)
 {
-    KColorSchemeManager::instance()->activateSchemeId(dark ? QStringLiteral("BreezeDark") : QString());
+    KColorSchemeManager::instance()->activateSchemeId(dark ? KdenCut::TouchMode::colorSchemeId() : QString());
 }
 
 void Splash::showProgressMessage(const QString &message, int)

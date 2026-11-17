@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openbox_menu xmlns="http://openbox.org/3.4/menu">
+<menu id="root-menu" label="MENU">
+<item label="KdenCut"><action name="Execute"><command>dbus-launch /usr/bin/kdenlive</command></action></item>
+<item label="KdenCut (show cursor)"><action name="Execute"><command>dbus-launch /usr/bin/kdenlive --show-cursor</command></action></item>
+<item label="xterm"><action name="Execute"><command>/usr/bin/xterm</command></action></item>
+</menu>
+</openbox_menu>

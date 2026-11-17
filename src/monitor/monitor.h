@@ -66,6 +66,8 @@ public:
 
     Monitor(Kdenlive::MonitorId id, MonitorManager *manager, QWidget *parent = nullptr);
     ~Monitor() override;
+    /** Use the phone workspace's transport bar and let the video fit its area. */
+    void setMobileLayout(bool mobile);
 
     enum MonitorOverlay {
         InfoOverlay = 0x01,
@@ -262,6 +264,8 @@ private:
     bool m_loopClipTransition;
     GenTime getSnapForPos(bool previous);
     QToolBar *m_toolbar;
+    QSize m_desktopMinimumSize;
+    QSize m_desktopVideoMinimumSize;
     QToolBar *m_trimmingbar;
     QAction *m_oneLess;
     QAction *m_oneMore;

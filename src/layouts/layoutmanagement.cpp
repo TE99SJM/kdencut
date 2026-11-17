@@ -217,6 +217,9 @@ bool LayoutManagement::slotLoadLayoutById(const QString &layoutId)
 
 bool LayoutManagement::slotLoadLayout(LayoutInfo layout, bool onlyIfNoPrevious)
 {
+    if (pCore->window()->isMobileWorkspace()) {
+        return true;
+    }
     if (!layout.isValid() || (onlyIfNoPrevious && m_firstLayoutLoaded)) {
         // Layout not found or has no data
         return false;
@@ -261,6 +264,9 @@ void LayoutManagement::adjustLayoutToDar()
 
 bool LayoutManagement::slotLoadLayoutFromData(const QString &layoutData, bool onlyIfNoPrevious)
 {
+    if (pCore->window()->isMobileWorkspace()) {
+        return true;
+    }
     if (layoutData.isEmpty() || (onlyIfNoPrevious && m_firstLayoutLoaded)) {
         // Layout not found or has no data
         return false;
@@ -317,7 +323,7 @@ void LayoutManagement::slotSaveLayout()
     } else {
         layout.path = fileName;
     }
-    const QByteArray layoutData = dockLayout.serializeLayout();
+    const QByteArray layoutData = pCore->window()->layoutForSaving();
     QJsonParseError jsonError;
     QJsonDocument doc = QJsonDocument::fromJson(layoutData, &jsonError);
     QJsonArray info;

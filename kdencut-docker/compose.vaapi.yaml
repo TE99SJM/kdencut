@@ -1,0 +1,8 @@
+services:
+  kdencut:
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      KDENCUT_GPU: vaapi
+      DRINODE: /dev/dri/renderD128
+      DRI_NODE: /dev/dri/renderD128

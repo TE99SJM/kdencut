@@ -393,6 +393,7 @@ Monitor::Monitor(Kdenlive::MonitorId id, MonitorManager *manager, QWidget *paren
     connect(rewind, &QAction::triggered, this, [&]() { Monitor::slotRewind(); });
 
     auto *playButton = new QToolButton(m_toolbar);
+    playButton->setObjectName(QStringLiteral("kdencutPlayButton"));
     m_playMenu = new QMenu(i18n("Play"), this);
     connect(m_playMenu, &QMenu::aboutToShow, this, &Monitor::slotActivateMonitor);
     QAction *originalPlayAction = static_cast<KDualAction *>(manager->getAction(QStringLiteral("monitor_play")));
@@ -676,7 +677,7 @@ void Monitor::slotLockMonitor(bool lock)
 void Monitor::setupMenu(QMenu *goMenu, QMenu *overlayMenu, QAction *playZone, QAction *playZoneFromCursor, QAction *loopZone, QAction *loopClip)
 {
     delete m_contextMenu;
-    m_contextMenu = new QMenu(this);
+    m_contextMenu = new QMenu(m_glWidget);
     m_contextMenu->addMenu(m_playMenu);
     if (goMenu) {
         m_contextMenu->addMenu(goMenu);
@@ -1052,8 +1053,7 @@ void Monitor::mousePressEvent(QMouseEvent *event)
             event->accept();
         }
     } else if (m_contextMenu) {
-        slotActivateMonitor();
-        m_contextMenu->popup(event->globalPosition().toPoint());
+        slotShowMenu(event->globalPosition().toPoint());
         event->accept();
     }
     QWidget::mousePressEvent(event);
@@ -1062,7 +1062,7 @@ void Monitor::mousePressEvent(QMouseEvent *event)
 void Monitor::slotShowMenu(const QPoint pos)
 {
     slotActivateMonitor();
-    if (m_contextMenu) {
+    if (m_contextMenu && m_glWidget->underMouse()) {
         updateMarkers();
         m_contextMenu->popup(pos);
     }
@@ -1435,7 +1435,7 @@ void Monitor::wheelEvent(QWheelEvent *event)
 void Monitor::mouseDoubleClickEvent(QMouseEvent *event)
 {
     event->accept();
-    if (!m_toolbar->underMouse()) {
+    if (event->button() == Qt::LeftButton && !m_toolbar->underMouse()) {
         slotSwitchFullScreen();
     }
 }
@@ -1910,6 +1910,25 @@ void Monitor::slotRefreshMonitor(bool visible)
         }
     } else {
         stop();
+    }
+}
+
+void Monitor::setMobileLayout(bool mobile)
+{
+    if (mobile) {
+        m_desktopMinimumSize = minimumSize();
+        m_desktopVideoMinimumSize = m_glWidget->minimumSize();
+        m_glMonitor->setFixedImageSize(QSize());
+        m_glWidget->setMinimumSize(160, 90);
+        setMinimumSize(0, 90);
+        m_toolbar->hide();
+        m_glMonitor->switchRuler(false);
+    } else {
+        setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+        setMinimumSize(m_desktopMinimumSize);
+        m_glWidget->setMinimumSize(m_desktopVideoMinimumSize);
+        m_toolbar->show();
+        m_glMonitor->switchRuler(KdenliveSettings::displayProjectMonitorInfo() & Monitor::InfoOverlay);
     }
 }
 

@@ -5,6 +5,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 */
 
 #include "mainwindow.h"
+#include "monitor/monitorproxy.h"
 #include "assets/assetpanel.hpp"
 #include "audiomixer/mixermanager.hpp"
 #include "bin/clipcreator.hpp"
@@ -117,6 +118,8 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include <QProxyStyle>
 #include <QPushButton>
 #include <QScreen>
+#include <QTimer>
+#include <QTabBar>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QStyleFactory>
@@ -769,6 +772,7 @@ void MainWindow::init()
 void MainWindow::finishUiSetup()
 {
     pCore->restoreLayout();
+    initializeTouchWorkspace();
     Q_EMIT pCore->closeSplash();
     setAutoSaveSettings();
     QObject::disconnect(pCore.get(), &Core::GUISetupDone, this, nullptr);
@@ -801,7 +805,10 @@ void MainWindow::loadBins(QStringList binInfo)
             ix = 1;
             bin = m_binWidgets.at(ix);
         }
-        auto toDelete = bin->parentWidget();
+        auto toDelete = bin->dockWidget();
+        if (toDelete == m_touchPanelDock) {
+            closeTouchPanel();
+        }
         m_binWidgets.takeAt(ix);
         delete toDelete;
     }
@@ -859,6 +866,7 @@ void MainWindow::loadContainerActions()
 
 MainWindow::~MainWindow()
 {
+    leaveTouchLayout();
     disconnect(qApp, &QApplication::focusChanged, this, &MainWindow::updateDeleteAction);
     QObject::disconnect(m_deleteActionStateConnection);
     pCore->prepareShutdown();
@@ -930,12 +938,12 @@ bool MainWindow::queryClose()
         }
     }
     // WARNING: According to KMainWindow::queryClose documentation we are not supposed to close the document here?
-    KDDockWidgets::LayoutSaver dockLayout(KDDockWidgets::RestoreOption_AbsoluteFloatingDockWindows);
-    KdenliveSettings::setKdockLayout(QString(dockLayout.serializeLayout()));
+    KdenliveSettings::setKdockLayout(QString(layoutForSaving()));
     // setAutoSaveSettings(QStringLiteral("MainWindow"), false);
     if (!pCore->projectManager()->closeCurrentDocument(true, true)) {
         return false;
     }
+    leaveTouchLayout();
     saveOptions();
     m_windowClosing = true;
     return true;
@@ -1546,7 +1554,13 @@ void MainWindow::connectDocument()
     }
 
     m_buttonSelectTool->setChecked(true);
-    connect(m_projectMonitorDock, &KDDockWidgets::QtWidgets::DockWidget::isOpenChanged, m_projectMonitor, &Monitor::slotRefreshMonitor, Qt::UniqueConnection);
+    QObject::disconnect(m_monitorDockVisibilityConnection);
+    m_monitorDockVisibilityConnection = connect(m_projectMonitorDock, &KDDockWidgets::QtWidgets::DockWidget::isOpenChanged, this, [this](bool visible) {
+        // The mobile workspace owns the visible monitor while its desktop dock is closed.
+        if (!m_touchCompactLayout) {
+            m_projectMonitor->slotRefreshMonitor(visible);
+        }
+    });
     connect(m_clipMonitorDock, &KDDockWidgets::QtWidgets::DockWidget::isOpenChanged, m_clipMonitor, &Monitor::slotRefreshMonitor, Qt::UniqueConnection);
     // Initialize audio mixer
     getCurrentTimeline()->model()->rebuildMixer();
@@ -2551,13 +2565,18 @@ void MainWindow::raiseBin(bool unconditionally)
 {
     Bin *bin = activeBin();
     if (bin) {
-        KDDockWidgets::QtWidgets::DockWidget *dock = qobject_cast<KDDockWidgets::QtWidgets::DockWidget *>(bin->parentWidget());
+        KDDockWidgets::QtWidgets::DockWidget *dock = qobject_cast<KDDockWidgets::QtWidgets::DockWidget *>(bin->dockWidget());
         if (!unconditionally) {
             if (dock && dock->asDockWidgetController()->isTabbed()) {
                 if (dock->asGroupController()->containsDockWidget(m_clipMonitorDock->asDockWidgetController())) {
                     return;
                 }
             }
+        }
+        if (m_touchCompactLayout) {
+            showTouchPanel(dock);
+            bin->focusBinView();
+            return;
         }
         bin->focusBinView();
         dock->open();
@@ -3214,7 +3233,11 @@ KDDockWidgets::QtWidgets::DockWidget *MainWindow::addDock(const QString &title, 
     widget->setProperty("_breeze_force_frame", false);
     dock->setTitle(title);
     dock->setWidget(widget);
+    if (auto *bin = qobject_cast<Bin *>(widget)) {
+        bin->setDockWidget(dock);
+    }
     dock->setObjectName(objectName);
+    connectTouchDock(dock);
     dock->toggleAction()->setData(QStringLiteral("%1#%2").arg(title, objectName));
     if (area == KDDockWidgets::Location_None) {
         // Add widget as tab
@@ -3278,6 +3301,12 @@ void MainWindow::slotUpdateMonitorOverlays(int id, int code)
 
 void MainWindow::raiseMonitor(bool clipMonitor, bool raise)
 {
+    if (m_touchCompactLayout) {
+        if (clipMonitor && raise) {
+            showTouchPanel(m_clipMonitorDock);
+        }
+        return;
+    }
     if (clipMonitor) {
         if (raise) {
             m_clipMonitorDock->open();
@@ -3835,14 +3864,17 @@ void MainWindow::slotRemoveBinDock(const QString &name)
     QWidget *toDelete = nullptr;
     int ix = 0;
     for (auto &b : m_binWidgets) {
-        if (b->parentWidget()->objectName() == name) {
-            toDelete = b->parentWidget();
+        if (b->dockWidget()->objectName() == name) {
+            toDelete = b->dockWidget();
             m_binWidgets.takeAt(ix);
             break;
         }
         ix++;
     }
     if (toDelete) {
+        if (toDelete == m_touchPanelDock) {
+            closeTouchPanel();
+        }
         toDelete->deleteLater();
     }
     if (!m_windowClosing) {
@@ -3862,10 +3894,11 @@ void MainWindow::addBin(Bin *bin, const QString &binName, bool updateCount, cons
     connect(bin, &Bin::requestBinCloseForFolder, this, [this](const QString &folderId) {
         for (auto &b : m_binWidgets) {
             if (b->rootFolderId() == folderId) {
-                Q_EMIT removeBinDock(b->parentWidget()->objectName());
+                Q_EMIT removeBinDock(b->dockWidget()->objectName());
             }
         }
     });
+    connect(pCore->projectItemModel().get(), &ProjectItemModel::folderNameChanged, this, &MainWindow::folderRenamed, Qt::UniqueConnection);
     m_binWidgets << bin;
     if (m_binWidgets.size() > 1) {
         // This is a secondary bin widget
@@ -3873,7 +3906,7 @@ void MainWindow::addBin(Bin *bin, const QString &binName, bool updateCount, cons
         // Ensure we have a unique id
         QStringList objectNames;
         for (auto &b : m_binWidgets) {
-            QWidget *p = b->parentWidget();
+            QWidget *p = b->dockWidget();
             if (p) {
                 objectNames << p->objectName();
             }
@@ -3919,7 +3952,10 @@ void MainWindow::cleanBins()
                 binHasFocus = true;
             }
         }
-        auto toDelete = bin->parentWidget();
+        auto toDelete = bin->dockWidget();
+        if (toDelete == m_touchPanelDock) {
+            closeTouchPanel();
+        }
         m_binWidgets.takeAt(ix);
         delete toDelete;
     }
@@ -3944,23 +3980,31 @@ void MainWindow::loadExtraBins(const QStringList binInfo)
     pCore->lastActiveBin.clear();
 
     for (auto &bin : m_binWidgets) {
-        KDDockWidgets::QtWidgets::DockWidget *dock = qobject_cast<KDDockWidgets::QtWidgets::DockWidget *>(bin->parentWidget());
+        auto *dock = qobject_cast<KDDockWidgets::QtWidgets::DockWidget *>(bin->dockWidget());
         if (!dock) {
             continue;
         }
+
         bool binFound = false;
         const QString dockName = dock->objectName() + QLatin1Char(':');
+
         for (const QString &info : binInfo) {
             if (info.startsWith(dockName)) {
-                existingNames << bin->loadInfo(info.split(QLatin1Char(':')), existingNames);
+                folderName = bin->loadInfo(info.split(QLatin1Char(':')), existingNames);
                 binFound = true;
                 break;
             }
         }
+
         if (!binFound) {
-            // Init bin with default settings
-            existingNames << bin->loadInfo({}, existingNames);
+            folderName = bin->loadInfo({}, existingNames);
         }
+
+        if (!folderName.isEmpty()) {
+            dock->setTitle(folderName);
+        }
+
+        existingNames << folderName;
     }
 }
 
@@ -3978,9 +4022,10 @@ void MainWindow::folderRenamed(const QString &binId, const QString &folderName)
     for (auto &b : m_binWidgets) {
         // Find out dock widget
         if (b->rootFolderId() == binId) {
-            KDDockWidgets::QtWidgets::DockWidget *dock = qobject_cast<KDDockWidgets::QtWidgets::DockWidget *>(b->parentWidget());
+            KDDockWidgets::QtWidgets::DockWidget *dock = qobject_cast<KDDockWidgets::QtWidgets::DockWidget *>(b->dockWidget());
             if (dock) {
                 dock->setWindowTitle(folderName);
+                dock->setTitle(folderName);
             }
             break;
         }
@@ -4006,7 +4051,7 @@ Bin *MainWindow::activeBin()
 {
     if (!pCore->lastActiveBin.isEmpty()) {
         for (auto &bin : m_binWidgets) {
-            if (bin->parentWidget()->objectName() == pCore->lastActiveBin) {
+            if (bin->dockWidget()->objectName() == pCore->lastActiveBin) {
                 return bin;
             }
         }
@@ -4181,6 +4226,7 @@ bool MainWindow::raiseTimeline(const QUuid &uuid)
 
 void MainWindow::connectTimelineApplication(TimelineWidget *timeline)
 {
+    connect(timeline, &TimelineWidget::touchCommand, this, &MainWindow::touchCommand);
     connect(timeline, &TimelineWidget::zoomIn, this, &MainWindow::slotZoomIn);
     connect(timeline, &TimelineWidget::zoomOut, this, &MainWindow::slotZoomOut);
     connect(timeline, &TimelineWidget::processingDrag, this, &MainWindow::enableUndo);
@@ -4438,7 +4484,7 @@ void MainWindow::slotCreateRangeMarkerFromZoneQuick()
 QSize MainWindow::sizeHint() const
 {
     const QSize desktopSize = QGuiApplication::primaryScreen()->availableSize();
-    return KXmlGuiWindow::sizeHint().expandedTo(desktopSize * 0.8);
+    return KXmlGuiWindow::sizeHint().expandedTo(desktopSize * 0.8).boundedTo(desktopSize);
 }
 
 void MainWindow::slotEditToolbars()

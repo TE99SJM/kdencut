@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!DOCTYPE kpartgui SYSTEM "kpartgui.dtd">
-<kpartgui name="kdenlive" version="253" translationDomain="kdenlive">
+<kpartgui name="kdenlive" version="254" translationDomain="kdenlive">
   <MenuBar>
     <Menu name="file">
       <Action name="file_new"/>
@@ -48,6 +48,9 @@
       <Action name="save_layout"/>
       <Action name="manage_layout"/>
       <Action name="show_titlebars"/>
+      <Separator/>
+      <Action name="kdencut_touch_mode"/>
+      <Action name="kdencut_show_cursor"/>
       <Separator/>
       <ActionList name="dock_actions"/>
     </Menu>
@@ -354,6 +357,13 @@
   </MenuBar>
   <ToolBar name="timelineToolBar" fullWidth="true" newline="true" noMerge="1" position="bottom">
     <text>Timeline Toolbar</text>
+    <Action name="edit_undo"/>
+    <Action name="edit_redo"/>
+    <Separator/>
+    <Action name="cut_timeline_clip"/>
+    <Action name="delete_selected_item"/>
+    <Action name="duplicate_timeline_clip"/>
+    <Separator/>
     <Action name="timeline_settings"/>
     <Action name="timeline_mode"/>
     <Action name="use_timeline_zone_in_edit"/>

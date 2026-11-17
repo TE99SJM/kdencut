@@ -396,6 +396,24 @@ void KdenliveDoc::initializeProperties(bool newDocument, std::pair<int, int> tra
         m_sequenceProperties.insert(m_uuid, sequenceProperties);
         // For existing documents, don't define guidesCategories, so that we can use the getDefaultGuideCategories() for backwards compatibility
         m_documentProperties[QStringLiteral("guidesCategories")] = MarkerListModel::categoriesListToJSon(KdenliveSettings::guidesCategories());
+
+        // Initialize tag definitions only for new documents, leaving existing projects' saved tags untouched.
+        QStringList projectBinTags = KdenliveSettings::projectBinTags();
+        if (projectBinTags.isEmpty()) {
+            // Keep the historical built-in tags when no custom defaults are configured.
+            projectBinTags = {QStringLiteral("%1:1:#ff0000").arg(i18n("Red")), QStringLiteral("%1:2:#00ff00").arg(i18n("Green")),
+                              QStringLiteral("%1:3:#0000ff").arg(i18n("Blue")), QStringLiteral("%1:4:#ffff00").arg(i18n("Yellow")),
+                              QStringLiteral("%1:5:#00ffff").arg(i18n("Cyan"))};
+        }
+
+        // Settings store categories as "name:index:color"; project tags use "color:name"
+        // under sequential tagN properties, so convert the format when initializing the project.
+        int tagIndex = 1;
+        for (const QString &tag : projectBinTags) {
+            const QString name = tag.section(QLatin1Char(':'), 0, -3);
+            const QString color = tag.section(QLatin1Char(':'), -1);
+            m_documentProperties[QStringLiteral("tag%1").arg(tagIndex++)] = QStringLiteral("%1:%2").arg(color, name);
+        }
     }
     connect(pCore.get(), &Core::saveGuideCategories, this, &KdenliveDoc::saveGuideCategories);
 }
@@ -1254,35 +1272,6 @@ const QString KdenliveDoc::folderForProjectFiles() const
     }
 }
 
-void KdenliveDoc::slotCreateTextTemplateClip(const QString &group, const QString &groupId, QUrl path)
-{
-    Q_UNUSED(group)
-    // TODO refac: this seem to be a duplicate of ClipCreationDialog::createTitleTemplateClip. See if we can merge
-    QString defaultFolder = folderForProjectFiles();
-    if (defaultFolder.isEmpty()) {
-        // Use video folder
-        defaultFolder = QStandardPaths::writableLocation(QStandardPaths::MoviesLocation);
-    }
-    QString titlesFolder = QDir::cleanPath(QDir(defaultFolder).absoluteFilePath(QStringLiteral("/titles/")));
-    if (path.isEmpty()) {
-        QPointer<QFileDialog> d = new QFileDialog(QApplication::activeWindow(), i18nc("@title:window", "Enter Template Path"), titlesFolder);
-        d->setMimeTypeFilters(QStringList() << QStringLiteral("application/x-kdenlivetitle"));
-        d->setFileMode(QFileDialog::ExistingFile);
-        if (d->exec() == QDialog::Accepted && !d->selectedUrls().isEmpty()) {
-            path = d->selectedUrls().constFirst();
-        }
-        delete d;
-    }
-
-    if (path.isEmpty()) {
-        return;
-    }
-
-    // TODO: rewrite with new title system (just set resource)
-    QString id = ClipCreator::createTitleTemplate(path.toString(), QString(), i18n("Template title clip"), groupId, pCore->projectItemModel());
-    Q_EMIT selectLastAddedClip(id);
-}
-
 void KdenliveDoc::setDocumentProperty(const QString &name, const QString &value)
 {
     if (value.isEmpty()) {
@@ -1952,30 +1941,48 @@ bool KdenliveDoc::loadDocumentProperties()
     QString proxyparams = m_documentProperties.value(QStringLiteral("proxyparams")).remove(QLatin1Char('\\'));
     if (!proxyparams.isEmpty()) {
         bool discard = false;
+        bool localProfile = true;
         const QString proxyExtension = m_documentProperties.value(QStringLiteral("proxyextension"));
         if (proxyExtension.length() > 8) {
             discard = true;
         } else {
-            // Sanitize parameters. First check for forbidden params
-            const QStringList forbiddenArgs = UiUtils::getProxyForbiddenParams();
-            for (auto &f : forbiddenArgs) {
-                if (proxyparams.contains(f)) {
-                    // Suspicious proxy parameters
-                    discard = true;
-                    break;
+            localProfile = UiUtils::isTrustedProxyProfile(proxyparams, proxyExtension);
+            if (localProfile) {
+                // Sanitize parameters. First check for forbidden params
+                const QStringList forbiddenArgs = UiUtils::getProxyForbiddenParams();
+                for (auto &f : forbiddenArgs) {
+                    if (proxyparams.contains(f)) {
+                        // Suspicious proxy parameters
+                        discard = true;
+                        break;
+                    }
                 }
             }
         }
-        if (discard) {
+        if (discard || !localProfile) {
             // Discard proxy settings
             m_documentProperties.remove(QStringLiteral("proxyparams"));
             m_documentProperties.remove(QStringLiteral("proxyextension"));
-            if (KMessageBox::warningContinueCancel(pCore->window(),
-                                                   i18n("Project file <b>%1</b> contains suspicious proxy parameters. This command might be "
-                                                        "executed:<br><br><code style=\"background-color:darkred;color:white\"><b>%2 -i "
-                                                        "input.mp4 %3 out.%4</b></code><br><br>These parameters will be discarded.",
-                                                        m_url.fileName(), KdenliveSettings::ffmpegpath(), proxyparams, proxyExtension),
-                                                   QString(), KStandardGuiItem::cont(), KGuiItem(i18n("Abort"))) != KMessageBox::Continue) {
+            QString warningMessage;
+            bool silenceWarning = false;
+            if (discard) {
+                warningMessage = i18n("Project file <b>%1</b> contains suspicious proxy parameters. This command might be "
+                                      "executed:<br><br><code style=\"background-color:darkred;color:white\"><b>%2 -i "
+                                      "input.mp4 %3 out.%4</b></code><br><br>These parameters will be discarded.",
+                                      m_url.fileName(), KdenliveSettings::ffmpegpath(), proxyparams, proxyExtension);
+            } else {
+                // Non local profile
+                if (!pCore->window()) {
+                    silenceWarning = true;
+                }
+                warningMessage = i18n("Project file <b>%1</b> contains an unknown proxy profile, it will be discarded. "
+                                      "This will only affect newly created proxy clips. If you really need to keep this profile and understand the ffmpeg "
+                                      "syntax and possible security risks, create a new proxy profile in the project settings with these "
+                                      "parameters:<br><code>%2<br>Extension: %3</code>",
+                                      m_url.fileName(), proxyparams, proxyExtension);
+            }
+            if (!silenceWarning && KMessageBox::warningContinueCancel(pCore->window(), warningMessage, QString(), KStandardGuiItem::cont(),
+                                                                      KGuiItem(i18n("Abort Loading"))) != KMessageBox::Continue) {
                 return false;
             }
         } else {
@@ -2070,15 +2077,30 @@ bool KdenliveDoc::loadDocumentProperties()
     }
 
     QString profile = m_documentProperties.value(QStringLiteral("profile"));
-    bool profileFound = pCore->setCurrentProfile(profile);
+    // Ensure that the profile path matches the profile's xml description
+    list = m_document.elementsByTagName(QStringLiteral("profile"));
+    std::unique_ptr<ProfileInfo> xmlProfile = nullptr;
+    if (!list.isEmpty() && !profile.isEmpty()) {
+        std::unique_ptr<ProfileModel> propertiesProfile(new ProfileModel(profile));
+        xmlProfile.reset(new ProfileParam(list.at(0).toElement()));
+        if (propertiesProfile->is_valid() && xmlProfile->is_valid()) {
+            // Ensure that both profiles match
+            if (propertiesProfile == xmlProfile) {
+                // Match, everything is ok.
+            } else {
+                // Profiles not matching, keep only xml info
+                profile.clear();
+            }
+        } else {
+            profile.clear();
+        }
+    }
+    bool profileFound = profile.isEmpty() ? false : pCore->setCurrentProfile(profile);
     if (!profileFound) {
         // try to find matching profile from MLT profile properties
-        list = m_document.elementsByTagName(QStringLiteral("profile"));
-        if (!list.isEmpty()) {
-            std::unique_ptr<ProfileInfo> xmlProfile(new ProfileParam(list.at(0).toElement()));
+        if (xmlProfile && xmlProfile->is_valid()) {
             // Check for valid fps
             if (!xmlProfile->hasValidFps()) {
-                qWarning() << "######################################\n#  ERROR, non standard fps detected  #\n######################################";
                 KMessageBox::error(
                     pCore->window(),
                     ki18nc("@label:textbox", "The project uses a non standard framerate (%1), this will result in misplaced clips and frame offset.")
@@ -2091,6 +2113,9 @@ bool KdenliveDoc::loadDocumentProperties()
                 profilePath = ProfileRepository::get()->saveProfile(xmlProfile.get());
             }
             profileFound = pCore->setCurrentProfile(profilePath);
+        } else {
+            KMessageBox::error(pCore->window(), ki18nc("@label:textbox", "Project's video profile is corrupted, using default one").toString());
+            profileFound = pCore->setCurrentProfile(KdenliveSettings::default_profile());
         }
     }
     if (!profileFound) {

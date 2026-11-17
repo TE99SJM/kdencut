@@ -23,6 +23,7 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 #include <QListWidget>
 #include <QMutex>
 #include <QPushButton>
+#include <QPointer>
 #include <QTimer>
 #include <QTreeView>
 #include <QUrl>
@@ -189,8 +190,8 @@ namespace BinColumns {
 inline constexpr int Name = 0;
 inline constexpr int Date = 1;
 inline constexpr int Description = 2;
-inline constexpr int Rating = 3;
-inline constexpr int FPS = 4;
+inline constexpr int Rating = 7;
+inline constexpr int FPS = 9;
 } // namespace BinColumns
 
 /**
@@ -207,6 +208,9 @@ class Bin : public QWidget
 public:
     explicit Bin(std::shared_ptr<ProjectItemModel> model, QWidget *parent = nullptr, bool isMainBin = true, BinViewType type = BinUnknownView);
     ~Bin() override;
+    // The mobile sheet temporarily reparents the bin; keep its stable dock identity.
+    void setDockWidget(QWidget *dock) { m_dockWidget = dock; }
+    QWidget *dockWidget() const { return m_dockWidget ? m_dockWidget.data() : parentWidget(); }
 
     struct ClipZoneInfo
     {
@@ -320,6 +324,8 @@ public:
     void emitRefreshPanel(const QString &id);
     /** @brief Returns true if there is a clip in bin. Timeline clips are ignored. */
     bool hasUserClip() const;
+    /** @brief Returns true if there is any another item in bin than main sequence. */
+    bool isEmpty() const;
     /** @brief Trigger reload of all clips. */
     void reloadAllProducers(bool reloadThumbs = true);
     /** @brief Ensure all audio thumbs have been created */
@@ -578,6 +584,7 @@ protected:
     QSize sizeHint() const override;
 
 private:
+    QPointer<QWidget> m_dockWidget;
     bool m_isMainBin;
     std::shared_ptr<ProjectItemModel> m_itemModel;
     QAbstractItemView *m_itemView;
