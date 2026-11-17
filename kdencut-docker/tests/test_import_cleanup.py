@@ -51,6 +51,51 @@ class CleanupTests(unittest.TestCase):
         self.clean.apply([token], 'restore')
         self.assertTrue(path.exists())
 
+    def test_backup_thumbnails_do_not_block_review_trash_or_purge(self):
+        self.setup_cleanup(); token, path = self.imported()
+        backups = self.folder/'.local/share/kdenlive/.backup'
+        backups.mkdir(parents=True)
+        (backups/'project-1234-2026-11-16-06-00.kdenlive').write_text('<mlt/>')
+        # saveSceneList() writes JPEG previews alongside the XML backups.
+        for name in ('project-1234-2026-11-16-06-00.kdenlive.jpg', 'other.KDENLIVE.JPG'):
+            (backups/name).write_bytes(b'\xff\xd8\xff\xe0JPEG thumbnail\xff\xd9')
+        candidates = self.clean.candidates()
+        self.assertEqual(candidates['projects'], 1)
+        self.assertEqual([row['id'] for row in candidates['files']], [token])
+        self.clean.apply([token], 'trash')
+        self.assertFalse(path.exists())
+        self.clean.apply([token], 'restore')
+        self.assertEqual(path.read_bytes(), b'original bytes')
+        self.clean.apply([token], 'trash')
+        self.clean.apply([token], 'purge')
+        self.assertEqual(self.clean.trashed(), [])
+
+    def test_backups_and_autosaves_still_protect_imports(self):
+        self.setup_cleanup(); token, path = self.imported()
+        for name in ('.backup/project-1234.kdenlive', 'project.kdenlive~',
+                     'project.kdenlive.autosave', 'stalefiles/encoded-project', 'timeline.mlt'):
+            with self.subTest(project=name):
+                project = self.folder/name
+                project.parent.mkdir(parents=True, exist_ok=True)
+                project.write_text(f'<mlt><property name="resource">{path}</property></mlt>')
+                self.assertEqual(self.clean.candidates()['files'], [])
+                with self.assertRaisesRegex(ValueError, 'usage changed'):
+                    self.clean.apply([token], 'trash')
+                self.assertEqual(path.read_bytes(), b'original bytes')
+                project.unlink()
+
+    def test_thumbnail_exception_keeps_unreadable_project_checks(self):
+        self.setup_cleanup(); self.imported()
+        for name in ('.backup/project.kdenlive', '.backup/project.kdenlive~',
+                     'stalefiles/project.kdenlive.jpg', 'project.kdenlive.jpg'):
+            with self.subTest(project=name):
+                project = self.folder/name
+                project.parent.mkdir(parents=True, exist_ok=True)
+                project.write_bytes(b'\xff\xd8unreadable project')
+                with self.assertRaisesRegex(ValueError, 'blocked'):
+                    self.clean.candidates()
+                project.unlink()
+
     def test_recent_pending_unowned_and_symlink_imports_are_kept(self):
         self.setup_cleanup(); self.imported(old=False)
         token, _ = self.imported()

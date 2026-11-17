@@ -36,6 +36,11 @@ class ImportCleanup:
                     raise ValueError('A linked project folder cannot be checked. Use a directly mounted project folder before cleanup.')
                 for name in files:
                     path = Path(folder)/name
+                    # saveSceneList() stores JPEG previews beside XML backups.
+                    # Keep the broad project/autosave scan, excluding only these
+                    # known thumbnails in Kdenlive's backup directory.
+                    if path.parent.name == '.backup' and name.lower().endswith('.kdenlive.jpg'):
+                        continue
                     is_project = '.kdenlive' in name.lower() or path.suffix.lower() == '.mlt' or 'stalefiles' in path.parts
                     if not is_project or path in scanned: continue
                     scanned.add(path)
