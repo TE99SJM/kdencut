@@ -11,7 +11,7 @@ find_package(KF6Completion REQUIRED)
 find_package(KF6ItemViews REQUIRED)
 find_package(KF6WidgetsAddons REQUIRED)
 enable_testing()
-foreach(target check_mobile_settings check_project_settings_ui check_touch_theme)
+foreach(target check_mobile_settings check_project_settings_ui check_touch_theme check_mobile_chrome)
     add_executable(${target} ../native/${target}.cpp
         ../../../src/kdencut/mobilesettings.cpp ../../../src/kdencut/controls.qrc)
     target_link_libraries(${target} PRIVATE Qt6::Widgets Qt6::Test)

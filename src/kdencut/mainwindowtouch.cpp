@@ -22,12 +22,9 @@
 #include <KActionCollection>
 #include <KLocalizedString>
 #include <KMessageBox>
-#include <KToolBar>
 #include <QApplication>
 #include <QDialog>
-#include <QMenuBar>
 #include <QScreen>
-#include <QStatusBar>
 #include <QTabBar>
 #include <QTimer>
 #include <QWindow>
@@ -113,19 +110,8 @@ void MainWindow::updateTouchLayout()
         }
     }
     m_touchHiddenWidgets.clear();
-    const auto bars = findChildren<QToolBar *>();
-    for (QWidget *widget : bars) {
-        if (!widget->isHidden()) {
-            m_touchHiddenWidgets.append(widget);
-            widget->hide();
-        }
-    }
-    for (QWidget *widget : {static_cast<QWidget *>(menuBar()), static_cast<QWidget *>(statusBar())}) {
-        if (!widget->isHidden()) {
-            m_touchHiddenWidgets.append(widget);
-            widget->hide();
-        }
-    }
+    // MobileWorkspace owns the desktop-bar guard for its full lifetime; a
+    // one-time hide here is undone by KXmlGuiWindow's saved-settings restore.
     for (QWidget *widget : {static_cast<QWidget *>(m_timelineTabs->tabBar()), m_timelineTabs->cornerWidget()}) {
         if (widget && !widget->isHidden()) {
             m_touchHiddenWidgets.append(widget);

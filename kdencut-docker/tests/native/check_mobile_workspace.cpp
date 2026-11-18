@@ -7,6 +7,9 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QLabel>
+#include <QMainWindow>
+#include <QMenuBar>
+#include <QToolBar>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSignalSpy>
@@ -85,6 +88,38 @@ class MobileChecks : public QObject
 {
     Q_OBJECT
 private Q_SLOTS:
+    void initTestCase()
+    {
+        KLocalizedString::setApplicationDomain("kdenlive");
+    }
+
+    void desktopBarsCannotCoverPreview()
+    {
+        QMainWindow window;
+        auto *toolbar = window.addToolBar(QStringLiteral("Desktop tools"));
+        toolbar->setObjectName(QStringLiteral("mainToolBar"));
+        toolbar->addAction(QStringLiteral("Save"));
+        window.menuBar()->addMenu(QStringLiteral("Editing"));
+        window.resize(430, 876);
+        window.show();
+        QTest::qWait(10);
+        const QByteArray desktop = window.saveState();
+        auto *preview = new QLabel(QStringLiteral("Video"));
+        auto *workspace = new KdenCut::MobileWorkspace(preview, new QLabel(QStringLiteral("Timeline")), {}, &window);
+        window.setCentralWidget(workspace);
+        QTest::qWait(10);
+        QCOMPARE(preview->mapTo(&window, QPoint()).y(), 0);
+        QVERIFY(window.restoreState(desktop));
+        window.menuBar()->show();
+        QTest::qWait(10);
+        QVERIFY(toolbar->isHidden());
+        QVERIFY(window.menuBar()->isHidden());
+        QCOMPARE(preview->mapTo(&window, QPoint()).y(), 0);
+        delete window.takeCentralWidget();
+        QVERIFY(toolbar->isVisible());
+        QVERIFY(window.menuBar()->isVisible());
+    }
+
     void gettextLabels()
     {
         // GNU gettext deliberately ignores LANGUAGE in the C locale.
@@ -436,11 +471,30 @@ private Q_SLOTS:
             }
             QVERIFY(preview->isVisible());
             QVERIFY(timeline->isVisible());
+            QCOMPARE(preview->mapTo(&workspace, QPoint()).y(), 0);
+            auto *projectControls = workspace.findChild<QWidget *>(QStringLiteral("mobileProjectControls"));
+            QVERIFY(projectControls);
+            QVERIFY(projectControls->mapTo(&workspace, QPoint()).y() >= preview->height());
             QVERIFY(workspace.rect().contains(QRect(preview->mapTo(&workspace, QPoint()), preview->size())));
             QVERIFY(workspace.rect().contains(QRect(timeline->mapTo(&workspace, QPoint()), timeline->size())));
             auto *splitter = workspace.findChild<QSplitter *>();
             QCOMPARE(splitter->orientation(), size.width() > size.height() ? Qt::Horizontal : Qt::Vertical);
         }
+        // The main editing strip stays at the bottom with a visible picture
+        // above each label, independently of the installed desktop icon theme.
+        QSet<qint64> icons;
+        for (const QString &name : {QStringLiteral("edit"), QStringLiteral("audio"), QStringLiteral("text"), QStringLiteral("effects"),
+                                    QStringLiteral("overlay"), QStringLiteral("captions"), QStringLiteral("filters"), QStringLiteral("adjust")}) {
+            auto *tool = workspace.findChild<QToolButton *>(QStringLiteral("mobile_") + name);
+            QVERIFY(tool);
+            QCOMPARE(tool->toolButtonStyle(), Qt::ToolButtonTextUnderIcon);
+            QVERIFY(!tool->icon().isNull());
+            QVERIFY(!tool->icon().pixmap(28, 28).isNull());
+            QVERIFY(!tool->text().isEmpty());
+            QVERIFY(tool->mapTo(&workspace, QPoint()).y() > timeline->mapTo(&workspace, QPoint()).y() + timeline->height());
+            icons.insert(tool->icon().cacheKey());
+        }
+        QCOMPARE(icons.size(), 8);
         QSignalSpy splitSpy(actions.value(QStringLiteral("cut_timeline_clip")), &QAction::triggered);
         auto *split = workspace.findChild<QToolButton *>(QStringLiteral("mobile_cut_timeline_clip"));
         QVERIFY(!split->isVisible());

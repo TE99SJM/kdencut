@@ -8,9 +8,13 @@ format. It runs natively or in a browser through the [Docker setup](kdencut-dock
 
 Touch Mode replaces the desktop docks with a preview, a touch timeline, and a
 swipeable tool strip. Portrait stacks the preview above the timeline; landscape
-places them side by side. Media, Save and Export stay at the top. Playback and
-undo/redo sit below the preview. Home offers a new video, opening projects and
+places them side by side. The preview starts at the top of the editor, with no
+desktop menu, workspace tabs or toolbar above it. Home, Media, Save and Export
+sit below the timeline, above the swipeable icon-and-label editing strip.
+Playback and undo/redo sit below the preview. Home offers a new video, opening projects and
 continuing the current edit. Home > Desktop controls restores the desktop layout.
+Saved desktop toolbar settings cannot bring the top bars back in Touch Mode;
+switching to Desktop controls restores their previous visibility.
 
 - Swipe the timeline to scrub under the centered playhead. Tap a clip to select
   it, hold and drag to move it, and drag its edge handles to trim. These operations

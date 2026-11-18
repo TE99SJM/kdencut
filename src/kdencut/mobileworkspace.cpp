@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL */
 #include "mobileworkspace.h"
 #include "mobilesettings.h"
+#include "mobilechrome.h"
 #include "touchscrolling.h"
 #include <KLocalizedString>
 
@@ -134,6 +135,9 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
     , m_timeline(timeline)
 {
     setObjectName(QStringLiteral("mobileWorkspace"));
+    if (auto *window = qobject_cast<QMainWindow *>(parent)) {
+        new MobileChrome(window, this);
+    }
     QFont mobileFont = font();
     mobileFont.setPixelSize(14);
     setFont(mobileFont);
@@ -167,7 +171,9 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
     auto *editor = new QVBoxLayout(m_editor);
     editor->setContentsMargins(0, 0, 0, 0);
     editor->setSpacing(0);
-    auto *header = new QHBoxLayout;
+    auto *projectControls = new QWidget;
+    projectControls->setObjectName(QStringLiteral("mobileProjectControls"));
+    auto *header = new QHBoxLayout(projectControls);
     header->setContentsMargins(8, 4, 8, 4);
     auto *home = button(i18n("Home"), QStringLiteral("go-home"), QStringLiteral("home"), false);
     header->addWidget(home);
@@ -180,7 +186,6 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
     exportButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
     exportButton->setObjectName(QStringLiteral("mobileExport"));
     header->addWidget(exportButton);
-    editor->addLayout(header);
 
     m_splitter = new QSplitter(Qt::Vertical);
     m_splitter->setObjectName(QStringLiteral("mobileSplitter"));
@@ -289,6 +294,9 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
         }
     });
     m_tools->setFixedHeight(qMax(m_mainTools->height(), m_editTools->height()));
+    // The preview is the first row. Keep project actions reachable alongside
+    // the bottom editing tools instead of using a header above the video.
+    editor->addWidget(projectControls);
     editor->addWidget(m_tools);
     m_pages->addWidget(m_editor);
 

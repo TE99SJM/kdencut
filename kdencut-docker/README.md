@@ -60,8 +60,12 @@ new upstream versions; returning to older code does not undo saved project edits
 
 ## Phone workspace
 
-Portrait places preview above timeline; landscape puts them side by side. Media,
-Save and Export remain at the top. Swipe the tool strip for additional tools.
+Portrait places preview above timeline; landscape puts them side by side. The
+video preview starts at the top, without desktop menus, workspace tabs or toolbars.
+Home, Media, Save and Export sit below the timeline, just above the bottom editing
+strip. Edit, Audio, Text, Effects, Overlay, Captions, Filters and Adjust use pictures
+with labels. Swipe the strip for additional tools. Saved desktop settings do not
+bring the top bars back; Home > Desktop controls restores the desktop bars.
 Edit offers Split, Delete, Duplicate, Speed, Volume, Fit and zoom. Tap a clip first;
 volume uses its audio selection. Ratio offers 9:16, 1:1 and 16:9 while preserving
 frame rate. Audio, titles and overlays insert on an empty matching track.
