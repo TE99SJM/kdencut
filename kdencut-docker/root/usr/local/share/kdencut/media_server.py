@@ -15,9 +15,11 @@ import shutil
 import threading
 import time
 import uuid
+from import_cleanup import ImportCleanup
 
-MEDIA_EXTENSIONS = set("mp4 mov m4v mkv avi webm mpg mpeg mts m2ts ts mxf vob ogv 3gp mp3 wav flac aac m4a ogg opus aiff aif wma jpg jpeg png webp gif bmp tif tiff heic heif avif svg".split())
+MEDIA_EXTENSIONS = set("mp4 mov m4v mkv avi webm mpg mpeg mts m2ts ts mxf vob ogv 3gp mp3 wav flac aac m4a ogg opus aiff aif wma jpg jpeg png webp gif bmp tif tiff heic heif avif svg json lottie rawr tgs lot".split())
 MAX_FILE = 100 * 1024**3
+CHUNK_SIZE = 1024**2
 
 
 def atomic_json(path, value):
@@ -59,10 +61,46 @@ class MediaStore:
         self.imports.mkdir(parents=True, exist_ok=True)
         os.chmod(self.bridge, 0o700)
         self.lock = threading.RLock()
+        self.cleanup_lock = threading.Lock()
         self.files = {}
         self.jobs = {}
+        self.uploads_file = self.bridge / "upload-sessions.json"
+        self.uploads = json.loads(self.uploads_file.read_text()) if self.uploads_file.exists() else {}
+        for token, item in list(self.uploads.items()):
+            response = self.bridge / (item["request"] + ".json")
+            if response.exists():
+                # A completed handoff survives a media-service restart.
+                result = json.loads(response.read_text())
+                if item["path"] in result.get("paths", []):
+                    del self.uploads[token]
+                    continue
+            if Path(item["path"]).is_file():
+                self.files[token] = {"request": item["request"], "path": item["path"]}
+        atomic_json(self.uploads_file, self.uploads)
         self.connections_file = self.bridge / "connections.json"
         self.connections = json.loads(self.connections_file.read_text()) if self.connections_file.exists() else {}
+        project_roots = [Path('/config')] + [path for path in self.roots.values() if path != self.imports.resolve()]
+        self.cleanup = ImportCleanup(self.imports, project_roots, self.live_usage)
+
+    def live_usage(self):
+        with self.cleanup_lock:
+            nonce = uuid.uuid4().hex
+            atomic_json(self.bridge/'usage-request.json', {'nonce':nonce})
+            for _ in range(60):
+                try:
+                    result = json.loads((self.bridge/'live-usage.json').read_text())
+                    if result.get('nonce') == nonce: return result
+                except (OSError, ValueError): pass
+                time.sleep(0.1)
+        raise ValueError('The editor did not respond. Wait until it finishes loading and try cleanup again.')
+
+    def storage_space(self):
+        usage = shutil.disk_usage(self.imports)
+        return {'free':usage.free, 'total':usage.total, 'low':usage.free < max(2*1024**3, usage.total*0.05)}
+
+    def protected_imports(self):
+        with self.lock:
+            return set(self.files) | set(self.uploads)
 
     def request(self):
         try:
@@ -83,6 +121,9 @@ class MediaStore:
         request = self.request()
         with self.lock:
             # Cancelled native dialogs can disappear without an HTTP cancel.
+            for token, item in list(self.uploads.items()):
+                if not request or item["request"] != request["id"]:
+                    self.discard_upload(token)
             for token, item in list(self.files.items()):
                 if not request or item["request"] != request["id"]:
                     shutil.rmtree(Path(item["path"]).parent, ignore_errors=True)
@@ -93,7 +134,7 @@ class MediaStore:
             job = dict(self.jobs.get(request["id"], {})) if request else {}
         if request and (self.bridge / (request["id"] + ".json")).exists():
             job["state"] = "done"
-        return {"request": request, "job": job}
+        return {"request": request, "job": job, "space": self.storage_space()}
 
     def sources(self):
         with self.lock:
@@ -188,7 +229,79 @@ class MediaStore:
         token = uuid.uuid4().hex
         folder = self.imports / token
         folder.mkdir(mode=0o700)
+        atomic_json(folder/'.kdencut-import.json', {'name':name, 'created':time.time()})
         return token, folder / name
+
+    def discard_upload(self, token, keep=False):
+        item = self.uploads.pop(token, None)
+        if item and not keep:
+            shutil.rmtree(Path(item["path"]).parent, ignore_errors=True)
+            self.files.pop(token, None)
+        atomic_json(self.uploads_file, self.uploads)
+
+    def upload_state(self, token):
+        item = self.uploads[token]
+        destination = Path(item["path"])
+        partial = destination.with_name(destination.name + ".part")
+        if not destination.exists() and partial.exists() and partial.stat().st_size == item["size"]:
+            os.replace(partial, destination)
+        complete = destination.is_file()
+        if complete:
+            self.files[token] = {"request": item["request"], "path": str(destination)}
+        offset = destination.stat().st_size if complete else partial.stat().st_size if partial.exists() else 0
+        return {"token": token, "offset": offset, "complete": complete, "chunk_size": CHUNK_SIZE}
+
+    def begin_upload(self, request_id, name, size, fingerprint):
+        self.active(request_id)
+        name = media_name(name)
+        if not isinstance(size, int) or not 0 < size <= MAX_FILE:
+            raise ValueError("File size must be between 1 byte and 100 GB")
+        if not isinstance(fingerprint, str) or not 1 <= len(fingerprint) <= 256:
+            raise ValueError("Invalid file fingerprint")
+        with self.lock:
+            self.active(request_id)
+            for token, item in self.uploads.items():
+                if (item["request"], item["name"], item["size"], item["fingerprint"]) == (request_id, name, size, fingerprint):
+                    return self.upload_state(token)
+            if shutil.disk_usage(self.imports).free < size + 64 * 1024**2:
+                raise ValueError("Not enough free server storage for this file")
+            token, destination = self.allocate(request_id, name)
+            self.uploads[token] = {"request": request_id, "name": name, "size": size,
+                                   "fingerprint": fingerprint, "path": str(destination)}
+            atomic_json(self.uploads_file, self.uploads)
+            return self.upload_state(token)
+
+    def receive_chunk(self, request_id, token, offset, size, stream):
+        self.active(request_id)
+        if not 0 < size <= CHUNK_SIZE or offset < 0:
+            raise ValueError("Invalid chunk size or offset")
+        chunk = stream.read(size)
+        if len(chunk) != size:
+            raise ValueError("Transfer interrupted. Retry this chunk.")
+        with self.lock:
+            self.active(request_id)
+            item = self.uploads[token]
+            if item["request"] != request_id:
+                raise ValueError("Upload belongs to another import")
+            state = self.upload_state(token)
+            destination = Path(item["path"])
+            partial = destination.with_name(destination.name + ".part")
+            if offset < state["offset"]:
+                # A lost response can cause an already-written chunk to be retried.
+                with open(destination if state["complete"] else partial, "rb") as existing:
+                    existing.seek(offset)
+                    if existing.read(size) != chunk:
+                        raise ValueError("Chunk differs from the saved file. Choose the original file again.")
+                return state
+            if offset != state["offset"] or offset + size > item["size"]:
+                raise ValueError("Upload offset changed. Resume from the saved offset.")
+            if shutil.disk_usage(self.imports).free < size + 64 * 1024**2:
+                raise ValueError("Not enough free server storage for this chunk")
+            with open(partial, "ab") as output:
+                output.write(chunk)
+                output.flush()
+                os.fsync(output.fileno())
+            return self.upload_state(token)
 
     def receive(self, request_id, name, size, stream):
         if size <= 0 or size > MAX_FILE:
@@ -223,21 +336,37 @@ class MediaStore:
         if not isinstance(tokens, list) or not tokens or len(tokens) > 500:
             raise ValueError("Select at least one media file")
         with self.lock:
+            self.active(request_id)
             files = [self.files[token] for token in tokens]
             if any(item["request"] != request_id for item in files):
                 raise ValueError("Files belong to another import")
             paths = [item["path"] for item in files]
-            atomic_json(self.bridge / (request_id + ".json"), {"id": request_id, "status": "ready", "paths": paths})
+            self.publish_paths(request_id, paths)
+
+    def publish_paths(self, request_id, paths):
+        with self.lock:
+            self.active(request_id)
+            selected = {Path(path).resolve() for path in paths}
             for token, item in list(self.files.items()):
                 if item["request"] == request_id:
-                    if token not in tokens:
+                    if Path(item["path"]).resolve() not in selected:
                         shutil.rmtree(Path(item["path"]).parent, ignore_errors=True)
                     del self.files[token]
+            for token, item in list(self.uploads.items()):
+                if item["request"] == request_id:
+                    self.discard_upload(token, keep=Path(item["path"]).resolve() in selected)
+            # Publish only after persisted cancellation/cleanup ownership is gone.
+            # Once native code consumes this response it may remove the bridge
+            # request immediately; a service restart must not delete its media.
+            atomic_json(self.bridge / (request_id + ".json"), {"id": request_id, "status": "ready", "paths": paths})
 
     def cancel(self, request_id, status="cancelled"):
-        self.active(request_id)
-        atomic_json(self.bridge / (request_id + ".json"), {"id": request_id, "status": status})
         with self.lock:
+            self.active(request_id)
+            atomic_json(self.bridge / (request_id + ".json"), {"id": request_id, "status": status})
+            for token, item in list(self.uploads.items()):
+                if item["request"] == request_id:
+                    self.discard_upload(token)
             for token, item in list(self.files.items()):
                 if item["request"] == request_id:
                     shutil.rmtree(Path(item["path"]).parent, ignore_errors=True)
@@ -254,8 +383,7 @@ class MediaStore:
                 media_name(file.name)
                 if not file.is_file():
                     raise ValueError("Choose files, not folders")
-            self.active(request_id)
-            atomic_json(self.bridge / (request_id + ".json"), {"id": request_id, "status": "ready", "paths": [str(p) for p in files]})
+            self.publish_paths(request_id, [str(p) for p in files])
             return
         with self.lock:
             if self.jobs.get(request_id, {}).get("state") == "copying":
@@ -353,19 +481,34 @@ class Handler(BaseHTTPRequestHandler):
                 result = store.sources()
             elif method == "GET" and parsed.path == "/list":
                 result = {"entries": store.listing(query["source"], query.get("path", ""))}
+            elif method == "GET" and parsed.path == "/cleanup-review":
+                result = store.cleanup.candidates(store.protected_imports())
+            elif method == "GET" and parsed.path == "/cleanup-trash":
+                result = {"files": store.cleanup.trashed()}
             elif method == "PUT" and parsed.path == "/upload":
                 self.connection.settimeout(120)
                 result = {"token": store.receive(query["request"], query["name"], int(self.headers.get("Content-Length", "0")), self.rfile)}
+            elif method == "PUT" and parsed.path == "/upload-chunk":
+                self.connection.settimeout(120)
+                result = store.receive_chunk(query["request"], query["token"], int(query["offset"]),
+                                             int(self.headers.get("Content-Length", "0")), self.rfile)
             elif method == "POST":
                 size = int(self.headers.get("Content-Length", "0"))
                 if not 0 < size <= 128 * 1024:
                     raise ValueError("Invalid request size")
                 body = json.loads(self.rfile.read(size))
-                if parsed.path == "/connections":
+                if parsed.path == "/upload-start":
+                    result = store.begin_upload(body["request"], body["name"], body["size"], body["fingerprint"])
+                elif parsed.path == "/connections":
                     result = store.connect(body)
                 elif parsed.path == "/forget":
                     store.forget(body["id"])
                     result = {}
+                elif parsed.path == "/cleanup":
+                    if body.get('confirmed_project_locations') is not True:
+                        raise ValueError('Confirm that all projects using these imports are stored in /config or /media.')
+                    store.cleanup.apply(body['files'], body['action'], store.protected_imports())
+                    result = {'space':store.storage_space()}
                 elif parsed.path == "/finish":
                     store.finish(body["request"], body["files"])
                     result = {}

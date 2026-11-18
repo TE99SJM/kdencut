@@ -3,6 +3,7 @@
   if (/^#(shared|player[234])(?:[?&]|$)/.test(location.hash)) return;
   const base = new URL('kdencut-media/', document.baseURI);
   let request = null, busy = false, xhr = null, source = '', path = '', browseSerial = 0;
+  let pendingUpload = [], uploadRun = 0;
   const selected = new Set();
   const el = (tag, text, parent, attrs = {}) => {
     const node = document.createElement(tag);
@@ -25,7 +26,7 @@
   // Keep a real file input in the tapped label: iOS needs a user gesture.
   const photoInput = el('input', '', photos, {type: 'file', accept: 'image/*,video/*', multiple: '', 'aria-label': 'Choose photos and videos'});
   const files = el('label', 'Browse Files', device, {class: 'kdencut-picker secondary'});
-  const fileInput = el('input', '', files, {type: 'file', accept: 'video/*,image/*,audio/*,.mkv,.mts,.m2ts,.mxf,.heic,.heif,.mov', multiple: '', 'aria-label': 'Browse device files'});
+  const fileInput = el('input', '', files, {type: 'file', accept: 'video/*,image/*,audio/*,.mkv,.mts,.m2ts,.mxf,.heic,.heif,.mov,.json,.lottie,.rawr,.tgs,.lot', multiple: '', 'aria-label': 'Browse device files'});
   const storage = el('section', '', content, {hidden: '', class: 'kdencut-storage'});
   const sourceRow = el('div', '', storage, {class: 'kdencut-source-row'});
   el('label', 'Storage location', sourceRow, {for: 'kdencut-storage-location', class: 'kdencut-muted'});
@@ -33,6 +34,7 @@
   const sourceActions = el('div', '', sourceRow, {class: 'kdencut-source-actions'});
   const addNas = el('button', '+ NAS', sourceActions, {type: 'button'});
   const forget = el('button', 'Forget', sourceActions, {type: 'button', hidden: ''});
+  const cleanImports = el('button', 'Storage', sourceActions, {type: 'button'});
   const crumbs = el('div', '', storage, {class: 'kdencut-breadcrumbs'});
   const up = el('button', '↑ Parent', crumbs, {type: 'button'});
   const folderLabel = el('span', '/', crumbs);
@@ -54,9 +56,24 @@
   el('p', 'The connection and credentials are saved on this server.', nas, {class: 'kdencut-muted'});
   const nasSave = el('button', 'Connect and save', nas, {type: 'submit', class: 'kdencut-primary'});
   const nasBack = el('button', 'Back', nas, {type: 'button'});
+  const cleanup = el('section', '', content, {hidden: '', class:'kdencut-cleanup'});
+  el('h3', 'Unused imports', cleanup);
+  el('p', 'Checks saved projects and autosaves in /config and /media, plus the open project. Imports less than a day old are protected. Originals on your server and NAS are never removed.', cleanup);
+  const scopeLabel = el('label', '', cleanup, {class:'kdencut-file'});
+  const scope = el('input', '', scopeLabel, {type:'checkbox'});
+  el('span', 'All projects using these imports are stored in /config or /media.', scopeLabel);
+  const review = el('button', 'Review unused imports', cleanup, {type:'button'});
+  const cleanupList = el('div', '', cleanup);
+  const trashSelected = el('button', 'Move selected to trash', cleanup, {type:'button', class:'kdencut-primary', disabled:''});
+  const showTrash = el('button', 'Recover deleted imports', cleanup, {type:'button'});
+  const purgeTrash = el('button', 'Permanently delete trash', cleanup, {type:'button', hidden:''});
+  const cleanupBack = el('button', 'Back to media', cleanup, {type:'button'});
+  let cleanupIds = new Set(), trashIds = [];
   const footer = el('footer', '', panel);
+  const spaceLabel = el('p', '', footer, {class:'kdencut-muted', 'aria-live':'polite'});
   const status = el('p', '', footer, {role: 'status', 'aria-live': 'polite'});
   const progress = el('progress', '', footer, {max: '100', value: '0', hidden: ''});
+  const retryUpload = el('button', 'Retry upload', footer, {type: 'button', hidden: ''});
   const serverPicker = el('button', 'Open server file picker', footer, {type: 'button', class: 'kdencut-muted'});
   let connections = new Set();
 
@@ -65,7 +82,7 @@
       headers: {'X-KdenCut-Media': '1', ...(body ? {'Content-Type': 'application/json'} : {})},
       ...(body ? {body: JSON.stringify(body)} : {})});
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Could not complete the request');
+    if (!response.ok) throw Object.assign(new Error(data.error || 'Could not complete the request'), {retryable: response.status >= 500});
     return data;
   }
   function message(text, error = false) {
@@ -80,23 +97,25 @@
     progress.hidden = !value;
   }
   function page(which) {
-    device.hidden = which !== 'device'; storage.hidden = which !== 'storage'; nas.hidden = which !== 'nas';
+    device.hidden = which !== 'device'; storage.hidden = which !== 'storage'; nas.hidden = which !== 'nas'; cleanup.hidden = which !== 'cleanup';
     deviceTab.setAttribute('aria-pressed', String(which === 'device'));
     storageTab.setAttribute('aria-pressed', String(which !== 'device'));
     message('');
   }
   function hide() {
+    uploadRun++; pendingUpload = []; retryUpload.hidden = true;
     request = null; browseSerial++; selected.clear();
     if (xhr) xhr.abort();
     xhr = null; lock(false); panel.close(); nas.reset();
     photoInput.value = ''; fileInput.value = '';
   }
   async function cancel(mode = 'cancel') {
+    uploadRun++; pendingUpload = []; retryUpload.hidden = true;
     const id = request?.id;
     if (xhr) xhr.abort();
     if (!id) return hide();
     try { await api(mode, {request: id}); hide(); }
-    catch (error) { message(error.message, true); }
+    catch (error) { lock(false); message(error.message, true); }
   }
   close.onclick = () => cancel();
   panel.addEventListener('cancel', event => {event.preventDefault(); cancel();});
@@ -105,7 +124,56 @@
   storageTab.onclick = () => {page('storage'); loadSources();};
   addNas.onclick = () => page('nas');
   nasBack.onclick = () => page('storage');
+  cleanImports.onclick = () => page('cleanup');
+  cleanupBack.onclick = () => page('storage');
   const bytes = size => size >= 1024**3 ? `${(size/1024**3).toFixed(1)} GB` : `${(size/1024**2).toFixed(1)} MB`;
+  function showSpace(space) {
+    if (!space) return;
+    spaceLabel.textContent = `${space.low ? 'Low storage: ' : ''}${bytes(space.free)} free on server`;
+    spaceLabel.classList.toggle('kdencut-error', space.low);
+  }
+  review.onclick = async () => {
+    cleanupList.replaceChildren(); cleanupIds.clear(); purgeTrash.hidden = true; trashSelected.hidden = false;
+    trashSelected.disabled = true;
+    if (!scope.checked) return message('Confirm where your projects are saved before reviewing imports.', true);
+    lock(true); message('Checking saved projects and the open project…');
+    try {
+      const data = await api('cleanup-review');
+      for (const item of data.files) {
+        const row = el('label', '', cleanupList, {class:'kdencut-file'});
+        const check = el('input', '', row, {type:'checkbox'});
+        el('span', `${item.name} · ${bytes(item.size)}`, row);
+        check.onchange = () => {check.checked ? cleanupIds.add(item.id) : cleanupIds.delete(item.id); trashSelected.disabled = !cleanupIds.size;};
+      }
+      message(`${data.projects} saved project(s) checked. ${data.files.length} unused import(s) eligible.`);
+    } catch (error) {message(error.message, true);}
+    finally {lock(false); trashSelected.disabled = !cleanupIds.size;}
+  };
+  async function cleanupAction(action, ids) {
+    if (!scope.checked) return message('Confirm where your projects are saved first.', true);
+    lock(true);
+    try {
+      const data = await api('cleanup', {action, files:ids, confirmed_project_locations:true});
+      cleanupList.replaceChildren(); cleanupIds.clear(); trashIds = []; purgeTrash.hidden = true;
+      showSpace(data.space); message(action === 'trash' ? 'Moved to recoverable trash. Permanently deleting trash frees the space.' : action === 'restore' ? 'Import restored to its original location.' : 'Unused trash permanently deleted.');
+    } catch (error) {message(error.message, true);}
+    finally {lock(false); trashSelected.disabled = true;}
+  }
+  trashSelected.onclick = () => cleanupAction('trash', [...cleanupIds]);
+  showTrash.onclick = async () => {
+    cleanupList.replaceChildren(); trashSelected.hidden = true;
+    try {
+      const data = await api('cleanup-trash'); trashIds = data.files.map(item => item.id);
+      for (const item of data.files) {
+        const restore = el('button', `Restore ${item.name}`, cleanupList, {type:'button', class:'kdencut-directory'});
+        restore.onclick = () => cleanupAction('restore', [item.id]);
+      }
+      purgeTrash.hidden = !trashIds.length; message(trashIds.length ? 'Restore files here, or recheck usage and permanently delete trash.' : 'Trash is empty.');
+    } catch (error) {message(error.message, true);}
+  };
+  purgeTrash.onclick = () => {
+    if (confirm('Permanently delete these unused imports? This cannot be undone. Project usage will be checked again.')) cleanupAction('purge', trashIds);
+  };
 
   async function loadSources(preferred) {
     const currentId = request?.id;
@@ -172,48 +240,88 @@
       await api('select', {request: currentId, source, paths: [...selected]});
     } catch (error) {if (request?.id === currentId) {lock(false); message(error.message, true);}}
   };
-  function sendFile(file, id, index, total) {
+  function sendChunk(file, id, state, index, total) {
     return new Promise((resolve, reject) => {
       const transfer = new XMLHttpRequest(); xhr = transfer;
-      transfer.open('PUT', new URL('upload?' + new URLSearchParams({request: id, name: file.name}), base));
+      transfer.open('PUT', new URL('upload-chunk?' + new URLSearchParams({request: id, token: state.token, offset: state.offset}), base));
+      transfer.timeout = 120000;
       transfer.setRequestHeader('X-KdenCut-Media', '1');
       transfer.upload.onprogress = event => {
         if (request?.id !== id) return;
-        progress.value = event.lengthComputable ? event.loaded/event.total*100 : 0;
-        message(`Uploading ${index}/${total}: ${file.name} · ${bytes(event.loaded)}${event.lengthComputable ? ' / ' + bytes(event.total) : ''}`);
+        progress.value = (state.offset + event.loaded) / file.size * 100;
+        message(`Uploading ${index}/${total}: ${file.name} · ${bytes(state.offset + event.loaded)} / ${bytes(file.size)}`);
       };
       transfer.onload = () => {
         if (xhr === transfer) xhr = null;
         try {
           const data = JSON.parse(transfer.responseText);
-          if (transfer.status < 200 || transfer.status >= 300) throw new Error(data.error || 'Upload failed');
-          resolve(data.token);
+          if (transfer.status < 200 || transfer.status >= 300) throw Object.assign(new Error(data.error || 'Upload failed'), {retryable: transfer.status >= 500});
+          resolve(data);
         } catch (error) {reject(error);}
       };
-      transfer.onerror = () => reject(new Error('Upload interrupted. Check your connection and choose the files again.'));
-      transfer.onabort = () => reject(new Error('Upload cancelled'));
-      transfer.send(file);
+      transfer.onerror = transfer.ontimeout = () => {
+        if (xhr === transfer) xhr = null;
+        reject(new Error('Connection dropped. Your completed chunks are saved.'));
+      };
+      transfer.onabort = () => reject(Object.assign(new Error('Upload cancelled'), {retryable: false}));
+      transfer.send(file.slice(state.offset, state.offset + state.chunk_size));
     });
+  }
+  async function sendFile(file, id, index, total, run) {
+    // Sample both ends as well as metadata, without reading a large video into RAM.
+    // This is an identity check for resuming, not a security hash.
+    const sample = new Uint8Array(await new Blob([file.slice(0, 65536), file.slice(Math.max(0, file.size - 65536))]).arrayBuffer());
+    let hash = 2166136261;
+    for (const byte of sample) hash = Math.imul(hash ^ byte, 16777619) >>> 0;
+    const fingerprint = `${file.lastModified}:${file.size}:${hash}`;
+    let failures = 0;
+    while (request?.id === id && uploadRun === run) {
+      try {
+        let state = await api('upload-start', {request: id, name: file.name, size: file.size, fingerprint});
+        while (!state.complete && request?.id === id && uploadRun === run) {
+          state = await sendChunk(file, id, state, index, total);
+          failures = 0;
+        }
+        if (state.complete) return state.token;
+      } catch (error) {
+        if (uploadRun !== run || request?.id !== id || error.retryable === false || failures >= 3) throw error;
+        failures++;
+        message(`Connection interrupted. Retrying ${failures}/3 from the last saved chunk…`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * 2**(failures - 1)));
+      }
+    }
+    throw Object.assign(new Error('Upload cancelled'), {retryable: false});
   }
   async function upload(input) {
     const chosen = [...input.files]; input.value = '';
     if (!chosen.length || !request || busy) return;
-    const id = request.id; const tokens = []; lock(true); progress.value = 0;
+    pendingUpload = chosen;
+    await resumeUpload();
+  }
+  async function resumeUpload() {
+    if (!request || busy || !pendingUpload.length) return;
+    const id = request.id, run = ++uploadRun, chosen = pendingUpload;
+    const tokens = []; lock(true); progress.value = 0; retryUpload.hidden = true;
     try {
       for (const [index, file] of chosen.entries()) {
-        if (request?.id !== id) return;
-        tokens.push(await sendFile(file, id, index + 1, chosen.length));
+        if (request?.id !== id || uploadRun !== run) return;
+        tokens.push(await sendFile(file, id, index + 1, chosen.length, run));
       }
-      if (request?.id === id) {message('Adding media to KdenCut…'); await api('finish', {request: id, files: tokens});}
+      if (request?.id === id && uploadRun === run) {message('Adding media to KdenCut…'); await api('finish', {request: id, files: tokens});}
     } catch (error) {
-      if (request?.id === id) {lock(false); message(error.message, true);}
+      if (request?.id === id && uploadRun === run) {
+        lock(false); retryUpload.hidden = false;
+        message(error.message + ' Tap Retry upload to continue.', true);
+      }
     }
   }
+  retryUpload.onclick = resumeUpload;
   photoInput.onchange = () => upload(photoInput);
   fileInput.onchange = () => upload(fileInput);
   async function poll() {
     try {
       const data = await api('status');
+      showSpace(data.space);
       if (!data.request || data.job.state === 'done') {if (request) hide(); return;}
       if (data.request.id !== request?.id) {
         if (request) hide();

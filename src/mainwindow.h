@@ -269,6 +269,8 @@ private:
     OtioImport *m_otioImport{nullptr};
     KColorSchemeManager *m_colorschemes;
     ScopeManager *m_scopesManager{nullptr};
+    void initializeTouchWorkspace();
+    void connectTouchDock(KDDockWidgets::QtWidgets::DockWidget *dock);
     void updateTouchLayout();
     void leaveTouchLayout();
     void showTouchPanel(KDDockWidgets::QtWidgets::DockWidget *dock);

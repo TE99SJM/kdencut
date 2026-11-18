@@ -283,6 +283,81 @@ surrounded by whitespace
         REQUIRE(subtitleModel->rowCount() == 0);
     }
 
+    SECTION("Delete a subtitle layer with overlapping starts in ID order")
+    {
+        const double fps = pCore->getCurrentFps();
+        subtitleModel->setMaxLayer(3);
+        std::vector<int> ids(4);
+        // Higher layers have lower IDs, so an ID-ordered move would encounter occupied destinations.
+        for (int layer = 3; layer >= 0; --layer) {
+            ids[layer] = KdenliveTests::getNextId();
+            REQUIRE(subtitleModel->addSubtitle(ids[layer], {layer, GenTime(10, fps)},
+                                               SubtitleEvent(true, GenTime(30, fps), "Default", "", 0, 0, 0, "", QString::number(layer)), false, false));
+        }
+        subtitleModel->requestDeleteLayer(1);
+        REQUIRE(subtitleModel->getMaxLayer() == 2);
+        REQUIRE(subtitleModel->rowCount() == 3);
+        CHECK_FALSE(subtitleModel->hasSubtitle(ids[1]));
+        CHECK(subtitleModel->getLayerForId(ids[0]) == 0);
+        CHECK(subtitleModel->getLayerForId(ids[2]) == 1);
+        CHECK(subtitleModel->getLayerForId(ids[3]) == 2);
+        for (int layer : {0, 2, 3}) {
+            CHECK(subtitleModel->getStartPosForId(ids[layer]) == GenTime(10, fps));
+            CHECK(subtitleModel->getText(ids[layer]) == QString::number(layer));
+        }
+        undoStack->undo();
+        REQUIRE(subtitleModel->rowCount() == 4);
+        CHECK(subtitleModel->getMaxLayer() == 3);
+        for (int layer = 0; layer < 4; ++layer) {
+            CHECK(subtitleModel->getLayerForId(ids[layer]) == layer);
+            CHECK(subtitleModel->getText(ids[layer]) == QString::number(layer));
+        }
+        undoStack->redo();
+        REQUIRE(subtitleModel->rowCount() == 3);
+        CHECK(subtitleModel->getMaxLayer() == 2);
+        CHECK_FALSE(subtitleModel->hasSubtitle(ids[1]));
+        CHECK(subtitleModel->getLayerForId(ids[2]) == 1);
+        CHECK(subtitleModel->getLayerForId(ids[3]) == 2);
+        undoStack->clear();
+        subtitleModel->removeAllSubtitles();
+    }
+
+    SECTION("Query subtitle ranges across layers")
+    {
+        const double fps = pCore->getCurrentFps();
+        subtitleModel->setMaxLayer(1);
+        auto add = [&](int layer, int start, int end) {
+            int id = KdenliveTests::getNextId();
+            REQUIRE(subtitleModel->addSubtitle(id, {layer, GenTime(start, fps)},
+                                               SubtitleEvent(true, GenTime(end, fps), "Default", "", 0, 0, 0, "", QStringLiteral("Subtitle")), false, false));
+            return id;
+        };
+        // Insert out of time order, including equal starts and overlapping events on different layers.
+        const int later = add(0, 100, 150);
+        const int first = add(0, 10, 20);
+        const int overlapping = add(1, 10, 40);
+        const int boundary = add(0, 30, 50);
+
+        CHECK(subtitleModel->getItemsInRange(-1, 0, -1) == std::unordered_set<int>{later, first, overlapping, boundary});
+        CHECK(subtitleModel->getItemsInRange(0, 0, -1) == std::unordered_set<int>{later, first, boundary});
+        CHECK(subtitleModel->getItemsInRange(1, 0, -1) == std::unordered_set<int>{overlapping});
+        CHECK(subtitleModel->getItemsInRange(-1, 20, 30) == std::unordered_set<int>{overlapping, boundary});
+        CHECK(subtitleModel->getItemsInRange(-1, 20, 20) == std::unordered_set<int>{overlapping});
+        CHECK(subtitleModel->getItemsInRange(-1, 10, 10) == std::unordered_set<int>{first, overlapping});
+        CHECK(subtitleModel->getItemsInRange(-1, 40, 40) == std::unordered_set<int>{boundary});
+        CHECK(subtitleModel->getItemsInRange(-1, 50, 99).empty());
+        CHECK(subtitleModel->getItemsInRange(2, 0, -1).empty());
+
+        REQUIRE(subtitleModel->moveSubtitle(overlapping, 1, GenTime(200, fps), false, false));
+        CHECK(subtitleModel->getItemsInRange(-1, 20, 30) == std::unordered_set<int>{boundary});
+        CHECK(subtitleModel->getItemsInRange(1, 200, -1) == std::unordered_set<int>{overlapping});
+        subtitleModel->switchLocked();
+        CHECK(subtitleModel->getItemsInRange(-1, 0, -1).empty());
+        subtitleModel->switchLocked();
+        subtitleModel->removeAllSubtitles();
+        CHECK(subtitleModel->getItemsInRange(-1, 0, -1).empty());
+    }
+
     SECTION("Read start/end time of the subtitles")
     {
         // srt

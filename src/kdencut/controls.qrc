@@ -1,0 +1,7 @@
+<RCC>
+  <qresource prefix="/kdencut/controls">
+    <file alias="increase.svg">controls/increase.svg</file>
+    <file alias="decrease.svg">controls/decrease.svg</file>
+    <file alias="dropdown.svg">controls/dropdown.svg</file>
+  </qresource>
+</RCC>

@@ -5,6 +5,7 @@ FROM ghcr.io/linuxserver/baseimage-selkies:ubunturesolute
 
 ARG MLT_VERSION=v7.42.0
 ARG BUILD_JOBS=0
+ARG TORCH_VERSION=2.15.0
 
 ENV TITLE=KdenCut \
     KDENCUT_MEDIA_BRIDGE=/config/.local/share/kdencut/media-bridge \
@@ -22,7 +23,7 @@ RUN \
   apt-get update && \
   apt-get build-dep -y kdenlive && \
   apt-get install -y --no-install-recommends \
-    git ninja-build cmake build-essential pkg-config \
+    git ninja-build cmake build-essential pkg-config autoconf automake libtool wget python3-venv \
     libkddockwidgets-qt6-dev libopentimelineio-dev libimath-dev \
     libswscale-dev libavfilter-dev libavdevice-dev libavformat-dev libavcodec-dev \
     libxml2-dev libsdl2-dev libsox-dev frei0r-plugins-dev frei0r-plugins libfftw3-dev \
@@ -31,24 +32,38 @@ RUN \
     breeze breeze-icon-theme qt6-svg-plugins qt6-image-formats-plugins \
     qml6-module-org-kde-desktop qml6-module-qtquick-shapes qml6-module-qtqml-models \
     qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-window \
-    libkf6i18nqml6 kded6 fonts-noto-core ffmpeg mediainfo && \
+    libkf6i18nqml6 kded6 fonts-noto-core ffmpeg mediainfo \
+    mesa-va-drivers intel-media-va-driver vainfo libvidstab-dev libopencv-dev zlib1g-dev libarchive-dev && \
   rm -rf /var/lib/apt/lists/*
+
+# RNNoise is not packaged for Ubuntu resolute. Build the pinned upstream release.
+RUN git clone --depth 1 --branch v0.2 https://github.com/xiph/rnnoise.git /tmp/rnnoise && \
+    cd /tmp/rnnoise && ./autogen.sh && ./configure --prefix=/usr/local --disable-examples && \
+    make -j 2 && make install && ldconfig && rm -rf /tmp/rnnoise
 
 # MLT (Kdenlive master needs >= 7.42, Ubuntu ships older)
 RUN \
   J=$([ "$BUILD_JOBS" -gt 0 ] && echo "$BUILD_JOBS" || nproc) && \
   git clone --depth 1 -b "$MLT_VERSION" https://github.com/mltframework/mlt.git /tmp/mlt && \
+  git -C /tmp/mlt submodule update --init --recursive --depth 1 && \
   cmake -S /tmp/mlt -B /tmp/mlt-build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -DMOD_QT=OFF -DMOD_QT6=ON -DMOD_GLAXNIMATE=OFF -DMOD_GLAXNIMATE_QT6=OFF \
-    -DSWIG_PYTHON=OFF -DMOD_OPENCV=OFF -DMOD_MOVIT=OFF -DBUILD_TESTING=OFF \
+    -DMOD_QT6=ON -DMOD_GLAXNIMATE_QT6=ON \
+    -DSWIG_PYTHON=OFF -DMOD_OPENCV=ON -DMOD_MOVIT=OFF -DBUILD_TESTING=OFF \
     -DMOD_SPATIALAUDIO=OFF -DMOD_GDK=OFF -DMOD_DECKLINK=OFF \
-    -DMOD_RNNOISE=OFF -DMOD_RTAUDIO=OFF -DMOD_PLACEBO=OFF -DMOD_OPENFX=OFF \
-    -DMOD_VIDSTAB=OFF -DMOD_XINE=OFF && \
+    -DMOD_RNNOISE=ON -DMOD_RTAUDIO=OFF -DMOD_PLACEBO=OFF -DMOD_OPENFX=OFF \
+    -DMOD_VIDSTAB=ON -DMOD_XINE=OFF && \
   ninja -C /tmp/mlt-build -j "$J" && \
   ninja -C /tmp/mlt-build install && \
   ldconfig && \
   rm -rf /tmp/mlt /tmp/mlt-build
+
+# CPU Whisper works on every host; the bundled multilingual tiny model avoids a
+# first-use download. Advanced users can install larger models in the editor.
+RUN python3 -m venv /opt/kdencut-speech && \
+    /opt/kdencut-speech/bin/pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu "torch==${TORCH_VERSION}" && \
+    /opt/kdencut-speech/bin/pip install --no-cache-dir openai-whisper==20250625 srt==3.5.3 && \
+    /opt/kdencut-speech/bin/python -c "import whisper; whisper._download(whisper._MODELS['tiny'], '/opt/kdencut-models', False)"
 
 # KdenCut itself (this repository)
 COPY . /tmp/kdencut

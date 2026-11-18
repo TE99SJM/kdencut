@@ -144,7 +144,7 @@ Rectangle {
 
     function fitZoom() {
         if (root.mobileLayout) return Math.max(0.01, root.width * 0.8 / Math.max(root.timeline.duration, K.Core.getCurrentFps() * 5))
-        return scrollView.width / (root.timeline.duration * 1.1)
+        return Math.max(0.01, scrollView.width / (Math.max(1, root.timeline.duration) * 1.1))
     }
 
     function scrollPos() {
@@ -1471,7 +1471,7 @@ function getTrackColor(audio, header) {
                     if (!active) {
                         return
                     }
-                    var minScale = root.fitZoom() / 4
+                    var minScale = Math.min(40, root.fitZoom() / 4)
                     var newScale = Math.max(minScale, Math.min(startScale * activeScale, 40))
                     var desiredX = anchorFrame * newScale - anchorX - activeTranslation.x
                     scrollView.contentY = root.clampContentY(startContentY - activeTranslation.y)
@@ -1833,7 +1833,7 @@ function getTrackColor(audio, header) {
                     }
                     var topTrackIx = Logic.getTrackIndexFromPos(Math.max(0, y))
                     var bottomTrackIx = Logic.getTrackIndexFromPos(Math.max(0, y) + selectionHeight)
-                    var bottomTrack = tracksRepeater.itemAt(bottomTrackIx) as Track
+                    var bottomTrack = tracksRepeater.itemAt(bottomTrackIx) as K.Track
                     // Check if bottom of rubber selection covers the last track compositions
                     console.log('Got rubber bottom: ', y, ' - height: ', selectionHeight, ', TK y: ', Logic.getTrackYFromId(bottomTrack.trackInternalId), ', SCROLLVIEWY: ', scrollView.contentY)
                     var selectBottomCompositions = ((y + selectionHeight) - Logic.getTrackYFromId(bottomTrack.trackInternalId)) > (Logic.getTrackHeightByPos(bottomTrackIx) * 0.6)
@@ -1841,7 +1841,7 @@ function getTrackColor(audio, header) {
                         var t = []
                         if (!selectOnlySubs) {
                             for (var i = topTrackIx; i <= bottomTrackIx; i++) {
-                                t.push((tracksRepeater.itemAt(i) as Track).trackInternalId)
+                                t.push((tracksRepeater.itemAt(i) as K.Track).trackInternalId)
                             }
                         }
                         var startFrame = Math.round(rubberSelect.x / root.timeScale)

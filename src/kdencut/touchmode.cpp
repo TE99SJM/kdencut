@@ -4,7 +4,10 @@
 */
 
 #include "touchmode.h"
+#include "touchscrolling.h"
 #include "mobileworkspace.h"
+#include "palettewatcher.h"
+#include "runtimefeatures.h"
 #include "kdenlivesettings.h"
 
 #include <KColorSchemeManager>
@@ -39,6 +42,14 @@ constexpr int touchIconSize = 28;
 constexpr int touchTrackHeight = 64;
 const char *scrollerProperty = "kdencutScroller";
 const char *iconSizeProperty = "kdencutOriginalIconSize";
+void fitTouchDialog(QDialog *dialog)
+{
+    if (!dialog || qobject_cast<QWizard *>(dialog)) return;
+    const QRect available = dialog->screen()->availableGeometry();
+    if (dialog->objectName() == QLatin1String("ProjectSettings_UI") || available.width() < 1100 || available.width() < available.height()) {
+        MobileWorkspace::fitDialog(dialog, available);
+    }
+}
 } // namespace
 
 QString TouchMode::colorSchemeId()
@@ -55,6 +66,7 @@ TouchMode *TouchMode::instance()
 TouchMode::TouchMode(QObject *parent)
     : QObject(parent)
 {
+    watchStylePalette(this);
 }
 
 qreal TouchMode::sizeMultiplier()
@@ -78,6 +90,7 @@ void TouchMode::initialize(bool forceShowCursor)
         return;
     }
     m_initialized = true;
+    configureRuntimeFeatures();
     m_sessionShowCursor = forceShowCursor;
 
     // Must happen before the first KColorSchemeManager::instance() so the scheme is listed.
@@ -98,6 +111,18 @@ void TouchMode::initialize(bool forceShowCursor)
     }
 
     qApp->installEventFilter(this);
+    // Remote rotation and the phone keyboard change the server display size.
+    // Refit open dialogs as well as the main workspace after that change.
+    const auto watchScreen = [this](QScreen *screen) {
+        connect(screen, &QScreen::availableGeometryChanged, this, [this]() {
+            if (!touchEnabled()) return;
+            for (QWidget *widget : QApplication::topLevelWidgets()) {
+                if (widget->isVisible()) fitTouchDialog(qobject_cast<QDialog *>(widget));
+            }
+        });
+    };
+    for (QScreen *screen : QGuiApplication::screens()) watchScreen(screen);
+    connect(qApp, &QGuiApplication::screenAdded, this, watchScreen);
 
     if (KdenliveSettings::touchmode()) {
         applyStyleSheet();
@@ -240,15 +265,7 @@ void TouchMode::enableTouchScrolling(QWidget *widget)
     if (!viewport) {
         return;
     }
-    area->setProperty(scrollerProperty, true);
-    QScroller::grabGesture(viewport, QScroller::TouchGesture);
-    QScroller *scroller = QScroller::scroller(viewport);
-    QScrollerProperties props = scroller->scrollerProperties();
-    props.setScrollMetric(QScrollerProperties::VerticalOvershootPolicy, QVariant::fromValue(QScrollerProperties::OvershootAlwaysOff));
-    props.setScrollMetric(QScrollerProperties::HorizontalOvershootPolicy, QVariant::fromValue(QScrollerProperties::OvershootAlwaysOff));
-    props.setScrollMetric(QScrollerProperties::DragStartDistance, 0.003);
-    props.setScrollMetric(QScrollerProperties::DecelerationFactor, 0.2);
-    scroller->setScrollerProperties(props);
+    enableSwipeScrolling(area, qEnvironmentVariableIsSet("KDENCUT_RUNTIME"));
     m_scrollViewports << viewport;
 }
 
@@ -303,10 +320,7 @@ bool TouchMode::eventFilter(QObject *watched, QEvent *event)
         if (KdenliveSettings::touchmode() && watched->isWidgetType()) {
             if (auto *dialog = qobject_cast<QDialog *>(watched); dialog && !qobject_cast<QWizard *>(dialog)) {
                 QTimer::singleShot(0, dialog, [dialog]() {
-                    const QRect available = dialog->screen()->availableGeometry();
-                    if (available.width() < 1100 || available.width() < available.height()) {
-                        MobileWorkspace::fitDialog(dialog, available);
-                    }
+                    fitTouchDialog(dialog);
                 });
             }
             if (auto *area = qobject_cast<QAbstractScrollArea *>(watched)) {

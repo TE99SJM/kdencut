@@ -7,11 +7,15 @@
 #include "kdencut/touchmode.h"
 #include "kdenlivesettings.h"
 
+#include <KConfig>
+#include <KConfigGroup>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QIcon>
+#include <QMap>
 #include <QPixmap>
+#include <QStandardPaths>
 
 const QStringList UiUtils::getProxySafeParams()
 {
@@ -38,8 +42,9 @@ const QStringList UiUtils::getProxySafeParams()
 
 const QStringList UiUtils::getProxyForbiddenParams()
 {
-    static QStringList forbiddenParams = {QStringLiteral("attach"), QStringLiteral("metadata"), QStringLiteral("null"),   QStringLiteral("dump"),
-                                          QStringLiteral("concat"), QStringLiteral("safe"),     QStringLiteral("ladspa"), QStringLiteral("protocol_whitelist"),
+    static QStringList forbiddenParams = {QStringLiteral("attach"), QStringLiteral("signature"), QStringLiteral("metadata"),
+                                          QStringLiteral("null"),   QStringLiteral("dump"),      QStringLiteral("concat"),
+                                          QStringLiteral("safe"),   QStringLiteral("ladspa"),    QStringLiteral("protocol_whitelist"),
                                           QStringLiteral("-ante "), QStringLiteral("-post ")};
     return forbiddenParams;
 }
@@ -78,6 +83,24 @@ qreal UiUtils::getBaseSizeMedium()
     QFontInfo fi(getFixedFont());
     // KdenCut: bigger timeline handles and buttons for fingers in touch mode
     return qRound(fi.pixelSize() * KdenCut::TouchMode::sizeMultiplier());
+}
+
+bool UiUtils::isTrustedProxyProfile(QString proxyData, const QString &extension)
+{
+    // FFmpeg option values can select file-writing filters and protocols, so
+    // option-name validation alone is insufficient for project-supplied data.
+    proxyData = proxyData.simplified().remove(QLatin1Char('\\'));
+    KConfig config(QStringLiteral("encodingprofiles.rc"), KConfig::CascadeConfig, QStandardPaths::AppDataLocation);
+    const KConfigGroup group(&config, QStringLiteral("proxy"));
+    const QMap<QString, QString> profiles = group.entryMap();
+    for (auto profile = profiles.cbegin(); profile != profiles.cend(); ++profile) {
+        QString trustedParams = profile.value().section(QLatin1Char(';'), 0, 0).simplified().remove(QLatin1Char('\\'));
+        const QString trustedExtension = profile.value().section(QLatin1Char(';'), 1, 1);
+        if (proxyData == trustedParams && extension == trustedExtension) {
+            return true;
+        }
+    }
+    return false;
 }
 
 QStringList UiUtils::checkUnknownProxyParams(QString proxyData)

@@ -1,10 +1,15 @@
 /* SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL */
 #include "../../../src/kdencut/mobileworkspace.h"
 #include <QAction>
+#include <KLocalizedString>
+#include <clocale>
 #include <QApplication>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QLabel>
+#include <QMainWindow>
+#include <QMenuBar>
+#include <QToolBar>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSignalSpy>
@@ -83,6 +88,97 @@ class MobileChecks : public QObject
 {
     Q_OBJECT
 private Q_SLOTS:
+    void initTestCase()
+    {
+        KLocalizedString::setApplicationDomain("kdenlive");
+    }
+
+    void desktopBarsCannotCoverPreview()
+    {
+        QMainWindow window;
+        auto *toolbar = window.addToolBar(QStringLiteral("Desktop tools"));
+        toolbar->setObjectName(QStringLiteral("mainToolBar"));
+        toolbar->addAction(QStringLiteral("Save"));
+        window.menuBar()->addMenu(QStringLiteral("Editing"));
+        window.resize(430, 876);
+        window.show();
+        QTest::qWait(10);
+        const QByteArray desktop = window.saveState();
+        auto *preview = new QLabel(QStringLiteral("Video"));
+        auto *workspace = new KdenCut::MobileWorkspace(preview, new QLabel(QStringLiteral("Timeline")), {}, &window);
+        window.setCentralWidget(workspace);
+        QTest::qWait(10);
+        QCOMPARE(preview->mapTo(&window, QPoint()).y(), 0);
+        QVERIFY(window.restoreState(desktop));
+        window.menuBar()->show();
+        QTest::qWait(10);
+        QVERIFY(toolbar->isHidden());
+        QVERIFY(window.menuBar()->isHidden());
+        QCOMPARE(preview->mapTo(&window, QPoint()).y(), 0);
+        delete window.takeCentralWidget();
+        QVERIFY(toolbar->isVisible());
+        QVERIFY(window.menuBar()->isVisible());
+    }
+
+    void gettextLabels()
+    {
+        // GNU gettext deliberately ignores LANGUAGE in the C locale.
+        const QByteArray previousLocale = std::setlocale(LC_MESSAGES, nullptr);
+        QVERIFY(std::setlocale(LC_MESSAGES, "en_US.UTF-8"));
+        KLocalizedString::addDomainLocaleDir("kdencut-test", QStringLiteral(KDENCUT_TEST_LOCALE));
+        KLocalizedString::setApplicationDomain("kdencut-test");
+        const auto original = KLocalizedString::languages();
+        KLocalizedString::setLanguages({QStringLiteral("fr")});
+        KdenCut::MobileWorkspace workspace(new QLabel("Preview"), new QLabel("Timeline"), {});
+        QCOMPARE(workspace.findChild<QToolButton *>("mobile_home")->text(), QStringLiteral("Accueil test"));
+        workspace.setTimecode(QStringLiteral("00:00:01"));
+        QCOMPARE(workspace.accessibleDescription(), QStringLiteral("Position test 00:00:01"));
+        workspace.setPlaying(true);
+        QCOMPARE(workspace.findChild<QToolButton *>("mobile_play")->accessibleName(), QStringLiteral("Pause test"));
+        KLocalizedString::setLanguages(original);
+        KLocalizedString::setApplicationDomain("kdenlive");
+        std::setlocale(LC_MESSAGES, previousLocale.constData());
+    }
+
+    void phoneEditingCommands()
+    {
+        QAction speed;
+        QAction advanced;
+        KdenCut::MobileWorkspace workspace(new QLabel("Preview"), new QLabel("Timeline"),
+            {{QStringLiteral("edit_item_speed"), &speed}, {QStringLiteral("project_render"), &advanced}});
+        workspace.resize(390, 844);
+        workspace.show();
+        QSignalSpy commands(&workspace, &KdenCut::MobileWorkspace::command);
+        QSignalSpy speeds(&speed, &QAction::triggered);
+        QSignalSpy exports(&advanced, &QAction::triggered);
+        const auto tap = [&](const char *name) {
+            auto *control = workspace.findChild<QToolButton *>(QString::fromLatin1(name));
+            QVERIFY(control);
+            control->click();
+        };
+        workspace.showEditTools();
+        tap("mobile_edit_item_speed");
+        QCOMPARE(speeds.size(), 1);
+        tap("mobile_volume");
+        QCOMPARE(commands.last().first().toString(), QStringLiteral("volume"));
+        tap("mobile_tools");
+        tap("mobile_ratio");
+        for (const char *ratio : {"portrait", "square", "landscape"}) {
+            tap(qPrintable(QStringLiteral("mobile_ratio-") + QString::fromLatin1(ratio)));
+            QCOMPARE(commands.last().first().toString(), QStringLiteral("ratio-") + QString::fromLatin1(ratio));
+        }
+        tap("mobileExport");
+        for (const char *platform : {"TikTok", "Reels", "Shorts"}) {
+            const QString name = QStringLiteral("export-") + QString::fromLatin1(platform);
+            auto *control = workspace.findChild<QToolButton *>(QStringLiteral("mobile_") + name);
+            QVERIFY(control && control->isVisible());
+            control->click();
+            QCOMPARE(commands.last().first().toString(), name);
+        }
+        tap("mobile_project_render");
+        QCOMPARE(exports.size(), 1);
+    }
+
     void panelExitsExpandedPreview()
     {
         auto *preview = new QLabel(QStringLiteral("Preview"));
@@ -369,13 +465,36 @@ private Q_SLOTS:
             auto *exportButton = workspace.findChild<QToolButton *>(QStringLiteral("mobileExport"));
             const QRect exportRect(exportButton->mapTo(&workspace, QPoint()), exportButton->size());
             QVERIFY(workspace.rect().contains(exportRect));
+            for (auto *button : workspace.findChildren<QToolButton *>()) {
+                if (!button->isVisible()) continue;
+                QVERIFY2(button->width() >= 48 && button->height() >= 48, qPrintable(button->objectName()));
+            }
             QVERIFY(preview->isVisible());
             QVERIFY(timeline->isVisible());
+            QCOMPARE(preview->mapTo(&workspace, QPoint()).y(), 0);
+            auto *projectControls = workspace.findChild<QWidget *>(QStringLiteral("mobileProjectControls"));
+            QVERIFY(projectControls);
+            QVERIFY(projectControls->mapTo(&workspace, QPoint()).y() >= preview->height());
             QVERIFY(workspace.rect().contains(QRect(preview->mapTo(&workspace, QPoint()), preview->size())));
             QVERIFY(workspace.rect().contains(QRect(timeline->mapTo(&workspace, QPoint()), timeline->size())));
             auto *splitter = workspace.findChild<QSplitter *>();
             QCOMPARE(splitter->orientation(), size.width() > size.height() ? Qt::Horizontal : Qt::Vertical);
         }
+        // The main editing strip stays at the bottom with a visible picture
+        // above each label, independently of the installed desktop icon theme.
+        QSet<qint64> icons;
+        for (const QString &name : {QStringLiteral("edit"), QStringLiteral("audio"), QStringLiteral("text"), QStringLiteral("effects"),
+                                    QStringLiteral("overlay"), QStringLiteral("captions"), QStringLiteral("filters"), QStringLiteral("adjust")}) {
+            auto *tool = workspace.findChild<QToolButton *>(QStringLiteral("mobile_") + name);
+            QVERIFY(tool);
+            QCOMPARE(tool->toolButtonStyle(), Qt::ToolButtonTextUnderIcon);
+            QVERIFY(!tool->icon().isNull());
+            QVERIFY(!tool->icon().pixmap(28, 28).isNull());
+            QVERIFY(!tool->text().isEmpty());
+            QVERIFY(tool->mapTo(&workspace, QPoint()).y() > timeline->mapTo(&workspace, QPoint()).y() + timeline->height());
+            icons.insert(tool->icon().cacheKey());
+        }
+        QCOMPARE(icons.size(), 8);
         QSignalSpy splitSpy(actions.value(QStringLiteral("cut_timeline_clip")), &QAction::triggered);
         auto *split = workspace.findChild<QToolButton *>(QStringLiteral("mobile_cut_timeline_clip"));
         QVERIFY(!split->isVisible());

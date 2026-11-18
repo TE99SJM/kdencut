@@ -28,8 +28,8 @@ QToolBar::separator {
 }
 
 QToolButton {
-    min-width: 40px;
-    min-height: 40px;
+    min-width: 48px;
+    min-height: 48px;
     padding: 4px 8px;
     border: 1px solid transparent;
     border-radius: 10px;
@@ -37,7 +37,7 @@ QToolButton {
 }
 
 QToolButton:hover {
-    background: #2a2a30;
+    background: palette(midlight);
 }
 
 QToolButton:pressed,
@@ -52,11 +52,11 @@ QToolButton:disabled {
 }
 
 QToolButton[popupMode="1"] {
-    padding-right: 22px;
+    padding-right: 48px;
 }
 
 QToolButton::menu-button {
-    width: 20px;
+    width: 44px;
     border: none;
     border-top-right-radius: 10px;
     border-bottom-right-radius: 10px;
@@ -64,22 +64,22 @@ QToolButton::menu-button {
 
 /* ---------- Push buttons ---------- */
 QPushButton {
-    min-height: 40px;
+    min-height: 48px;
     min-width: 72px;
     padding: 6px 18px;
     border-radius: 10px;
     border: 1px solid #34343a;
-    background: #26262b;
+    background: palette(button);
     color: palette(button-text);
 }
 
 QPushButton:hover {
-    background: #2f2f35;
+    background: palette(midlight);
     border-color: #44444c;
 }
 
 QPushButton:pressed {
-    background: #1c1c20;
+    background: palette(mid);
 }
 
 QPushButton:default {
@@ -105,22 +105,22 @@ QPushButton:disabled {
 
 /* ---------- Tabs (CapCut asset bar look) ---------- */
 QTabBar::tab {
-    min-height: 40px;
+    min-height: 48px;
     min-width: 64px;
     padding: 6px 16px;
     margin: 2px 2px 0px 2px;
     border: none;
     border-bottom: 3px solid transparent;
     background: transparent;
-    color: #9a9aa2;
+    color: palette(window-text);
 }
 
 QTabBar::tab:hover {
-    color: #e8e8ea;
+    color: palette(text);
 }
 
 QTabBar::tab:selected {
-    color: #ffffff;
+    color: palette(window-text);
     border-bottom: 3px solid #00c1cd;
 }
 
@@ -133,12 +133,14 @@ QTabWidget::pane {
 QLineEdit,
 QAbstractSpinBox,
 QComboBox {
-    min-height: 36px;
+    min-height: 44px;
     padding: 2px 10px;
     border-radius: 8px;
     border: 1px solid #34343a;
-    background: #141416;
-    selection-background-color: #00838c;
+    background: palette(base);
+    color: palette(text);
+    selection-background-color: palette(highlight);
+    selection-color: palette(highlighted-text);
 }
 
 QLineEdit:focus,
@@ -148,7 +150,7 @@ QComboBox:focus {
 }
 
 QComboBox::drop-down {
-    width: 32px;
+    width: 44px;
     border: none;
 }
 
@@ -158,16 +160,40 @@ TimecodeDisplay {
     min-width: 120px;
 }
 
-QAbstractSpinBox::up-button,
-QAbstractSpinBox::down-button {
-    width: 28px;
+/* Separate full-height +/- targets, instead of two tiny stacked arrows. */
+QSpinBox, QDoubleSpinBox { padding-right: 96px; }
+QSpinBox::up-button, QSpinBox::down-button,
+QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: center right;
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    border-left: 1px solid palette(mid);
 }
+QSpinBox::down-button, QDoubleSpinBox::down-button { right: 45px; }
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+    image: url(:/kdencut/controls/increase.svg);
+    width: 18px; height: 18px;
+}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+    image: url(:/kdencut/controls/decrease.svg);
+    width: 18px; height: 18px;
+}
+QComboBox { padding-right: 44px; combobox-popup: 0; }
+QComboBox::down-arrow {
+    image: url(:/kdencut/controls/dropdown.svg);
+    width: 18px; height: 18px;
+}
+QComboBox QAbstractItemView::item { min-height: 48px; }
 
 QComboBox QAbstractItemView {
-    background: #1e1e22;
+    background: palette(base);
+    color: palette(text);
     border: 1px solid #34343a;
     border-radius: 8px;
-    selection-background-color: #00838c;
+    selection-background-color: palette(highlight);
+    selection-color: palette(highlighted-text);
     outline: none;
 }
 
@@ -180,7 +206,7 @@ QAbstractItemView {
 
 QTreeView::item,
 QListView::item {
-    min-height: 36px;
+    min-height: 44px;
     padding: 2px 4px;
 }
 
@@ -202,20 +228,20 @@ QHeaderView::section {
 /* ---------- Check boxes and radio buttons ---------- */
 QCheckBox,
 QRadioButton {
-    min-height: 36px;
+    min-height: 44px;
     spacing: 10px;
 }
 
 QCheckBox::indicator,
 QRadioButton::indicator,
 QGroupBox::indicator {
-    width: 22px;
-    height: 22px;
+    width: 28px;
+    height: 28px;
 }
 
 /* ---------- Sliders ---------- */
 QSlider {
-    min-height: 36px;
+    min-height: 44px;
 }
 
 QSlider::groove:horizontal {
@@ -319,7 +345,7 @@ QMenuBar::item {
 
 QMenuBar::item:selected,
 QMenuBar::item:pressed {
-    background: #2a2a30;
+    background: palette(midlight);
 }
 
 QMenu {
@@ -362,7 +388,7 @@ QGroupBox::title {
     subcontrol-origin: margin;
     left: 12px;
     padding: 0px 4px;
-    color: #9a9aa2;
+    color: palette(window-text);
 }
 
 QToolTip {

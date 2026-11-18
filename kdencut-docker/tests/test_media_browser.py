@@ -91,6 +91,63 @@ class BrowserMediaTests(unittest.TestCase):
         self.assertEqual(self.wait_result()['paths'], [str(clip)])
         self.assertEqual(self.errors, [])
 
+    def test_chunk_upload_resumes_after_lost_response(self):
+        offsets = []
+        def drop_first_response(route):
+            from urllib.parse import parse_qs, urlsplit
+            offsets.append(int(parse_qs(urlsplit(route.request.url).query)['offset'][0]))
+            if len(offsets) == 1:
+                route.fetch()  # Server has saved the chunk, but the phone misses the reply.
+                route.abort('connectionreset')
+            else:
+                route.continue_()
+        self.page.route('**/upload-chunk?*', drop_first_response)
+        payload = b'v' * (media.CHUNK_SIZE * 2 + 9)
+        self.page.get_by_role('button', name='This device').click()
+        self.page.get_by_label('Browse device files').set_input_files({'name':'resumed.mov', 'mimeType':'video/quicktime', 'buffer':payload})
+        result = self.wait_result()
+        self.assertEqual(Path(result['paths'][0]).read_bytes(), payload)
+        self.assertEqual(offsets, [0, media.CHUNK_SIZE, media.CHUNK_SIZE * 2])
+        self.assertEqual(self.errors, [])
+
+    def test_failed_cancel_leaves_chooser_usable(self):
+        self.page.route('**/upload-chunk?*', lambda route: route.abort('connectionreset'))
+        self.page.route('**/kdencut-media/cancel', lambda route: route.abort('connectionreset'))
+        self.page.get_by_role('button', name='This device').click()
+        self.page.get_by_label('Browse device files').set_input_files({'name':'offline.mov', 'mimeType':'video/quicktime', 'buffer':b'video'})
+        self.page.get_by_text('Connection interrupted.', exact=False).wait_for()
+        self.page.get_by_role('button', name='Cancel', exact=True).click()
+        self.page.get_by_role('status').filter(has_text='Failed to fetch').wait_for()
+        self.assertTrue(self.page.get_by_role('button', name='This device').is_enabled())
+        self.assertTrue(self.page.get_by_label('Browse device files').is_enabled())
+        self.page.unroute('**/kdencut-media/cancel')
+        self.page.get_by_role('button', name='Cancel', exact=True).click()
+        self.assertEqual(self.wait_result()['status'], 'cancelled')
+        self.assertEqual(self.errors, [])
+
+    def test_storage_warning_and_recoverable_cleanup(self):
+        from import_cleanup import ImportCleanup
+        original, space = self.store.cleanup, self.store.storage_space
+        self.addCleanup(setattr, self.store, 'cleanup', original)
+        self.addCleanup(setattr, self.store, 'storage_space', space)
+        self.store.cleanup = ImportCleanup(self.store.imports, [self.root/'media'], lambda:{'available':True, 'at':time.time()*1000, 'xml':'<clips/>'})
+        self.store.storage_space = lambda:{'free':1024**2, 'total':1024**4, 'low':True}
+        token, path = self.store.allocate(self.id, 'unused-old.mov')
+        path.write_bytes(b'keep these bytes')
+        media.atomic_json(path.parent/'.kdencut-import.json', {'name':path.name, 'created':time.time()-90000})
+        self.page.get_by_text('Low storage:', exact=False).wait_for()
+        self.page.get_by_role('button', name='Storage', exact=True).click()
+        self.page.get_by_role('checkbox', name='All projects using').check()
+        self.page.get_by_role('button', name='Review unused imports').click()
+        self.page.get_by_role('checkbox', name='unused-old.mov', exact=False).check()
+        self.page.get_by_role('button', name='Move selected to trash').click()
+        self.page.get_by_text('Moved to recoverable trash.', exact=False).wait_for()
+        self.assertFalse(path.exists())
+        self.page.get_by_role('button', name='Recover deleted imports').click()
+        self.page.get_by_role('button', name='Restore unused-old.mov').click()
+        self.page.get_by_text('Import restored to its original location.').wait_for()
+        self.assertEqual(path.read_bytes(), b'keep these bytes')
+
     def test_portrait_storage_long_names_and_selection(self):
         folder = self.root/'media'/'Portrait'
         folder.mkdir(exist_ok=True)

@@ -7,9 +7,11 @@ import tempfile
 import time
 import unittest
 import uuid
+import sys
 from unittest.mock import patch
 
 ASSETS = Path(__file__).resolve().parents[1] / 'root/usr/local/share/kdencut'
+sys.path.insert(0, str(ASSETS))
 spec = importlib.util.spec_from_file_location('media_server', ASSETS / 'media_server.py')
 media = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(media)

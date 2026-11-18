@@ -2,11 +2,14 @@ name: KdenCut container build
 
 on:
   push:
-    branches: [kdencut-touch-capcut, kdencut-mobile-layout, kdencut-device-nas-import]
+    branches: [kdencut-touch-capcut, kdencut-mobile-layout, kdencut-device-nas-import, kdencut-phone-completion]
     paths:
       - 'src/**'
       - 'kdencut-docker/**'
       - 'CMakeLists.txt'
+      - 'data/profiles.xml'
+      - 'data/scripts/whisper/**'
+      - 'KDENCUT.md'
       - '.qmllint.ini'
       - '.github/workflows/kdencut-build.yml'
   workflow_dispatch:
@@ -19,7 +22,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  settings:
+    runs-on: ubuntu-latest
+    container: ghcr.io/linuxserver/baseimage-selkies:ubunturesolute
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install the production Qt and KDE widget versions
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends cmake g++ make qt6-base-dev qt6-svg-plugins libkf6kio-dev libkf6completion-dev libkf6itemviews-dev libkf6widgetsaddons-dev
+      - name: Check touch settings before compiling the editor
+        run: |
+          cmake -S kdencut-docker/tests/settings -B /tmp/settings-checks
+          cmake --build /tmp/settings-checks -j 2
+          ctest --test-dir /tmp/settings-checks --output-on-failure
   build:
+    needs: settings
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -29,7 +52,7 @@ jobs:
       - name: Build the production container, including QML lint
         run: docker build --build-arg BUILD_JOBS=2 -f kdencut-docker/Dockerfile -t kdencut-ci .
       - name: Check phone viewport messages
-        run: node --test kdencut-docker/tests/test_mobile_logic.cjs
+        run: node --test kdencut-docker/tests/test_*.cjs
       - name: Compile and run the native phone layout checks
         run: |
           docker run --rm --entrypoint /bin/bash -v "$PWD:/src:ro" kdencut-ci -lc '
@@ -39,6 +62,8 @@ jobs:
           '
       - name: Check packaged media service and editor login
         run: python3 kdencut-docker/tests/test_media_container.py
+      - name: Check packaged effects and offline Whisper captions
+        run: docker run --rm --entrypoint python3 -v "$PWD:/src:ro" kdencut-ci /src/kdencut-docker/tests/check_packaged_features.py
   media:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -47,7 +72,14 @@ jobs:
         with:
           persist-credentials: false
       - name: Check uploads and NAS file handling
-        run: python3 -m unittest discover -s kdencut-docker/tests -p test_media_server.py -v
+        run: |
+          python3 -m unittest discover -s kdencut-docker/tests -p test_media_server.py -v
+          python3 -m unittest discover -s kdencut-docker/tests -p test_resumable_uploads.py -v
+          python3 -m unittest discover -s kdencut-docker/tests -p test_import_cleanup.py -v
+          python3 -m unittest discover -s kdencut-docker/tests -p test_gpu.py -v
+          python3 -m unittest discover -s kdencut-docker/tests -p test_speech_setup.py -v
+          python3 -m unittest discover -s kdencut-docker/tests -p test_touch_integration.py -v
+          python3 -m unittest discover -s kdencut-docker/tests -p test_docs.py -v
       - name: Install media integration test dependencies
         run: |
           python3 -m venv /tmp/media-tests
@@ -57,6 +89,8 @@ jobs:
         env:
           KDENCUT_MEDIA_SCREENSHOT: /tmp/kdencut-media-chooser.png
         run: /tmp/media-tests/bin/python -m unittest discover -s kdencut-docker/tests -p test_media_browser.py -v
+      - name: Check mobile viewport, cursor and touch targets
+        run: /tmp/media-tests/bin/python -m unittest discover -s kdencut-docker/tests -p test_mobile_viewport.py -v
       - name: Check real SMB share downloads
         run: /tmp/media-tests/bin/python -m unittest discover -s kdencut-docker/tests -p test_media_smb.py -v
       - uses: actions/upload-artifact@v4
@@ -64,3 +98,4 @@ jobs:
         with:
           name: media-chooser-preview
           path: /tmp/kdencut-media-chooser*.png
+

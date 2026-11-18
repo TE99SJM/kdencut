@@ -9,10 +9,49 @@
   let previousSize = '';
   const viewer = /^#(shared|player[234])(?:[?&]|$)/.test(location.hash);
   const send = (message) => window.postMessage(message, location.origin);
+  let cursorInput = null;
+  let cursorObserver = null;
+  let originalCursor = ['', ''];
+
+  function restoreCursor() {
+    cursorObserver?.disconnect();
+    cursorObserver = null;
+    if (cursorInput) {
+      cursorInput.cursorDiv?.classList.remove('kdencut-remote-cursor');
+      const style = cursorInput.element?.style;
+      if (style) {
+        if (originalCursor[0]) style.setProperty('cursor', ...originalCursor);
+        else style.removeProperty('cursor');
+      }
+    }
+    cursorInput = null;
+  }
+
+  function syncCursor() {
+    const input = window.webrtcInput;
+    if (!touch.matches || viewer || input !== cursorInput) restoreCursor();
+    if (!touch.matches || viewer || !input?.element || !input?.cursorDiv) return;
+    if (cursorInput) return;
+    cursorInput = input;
+    const style = input.element.style;
+    originalCursor = [style.getPropertyValue('cursor'), style.getPropertyPriority('cursor')];
+    // Selkies draws its pointer separately from the video, and may re-show it
+    // on every tap. Hide that owned layer without touching its input handlers.
+    input.cursorDiv.classList.add('kdencut-remote-cursor');
+    const hideBrowserCursor = () => {
+      if (style.getPropertyValue('cursor') === 'none' && style.getPropertyPriority('cursor') === 'important') return;
+      originalCursor = [style.getPropertyValue('cursor'), style.getPropertyPriority('cursor')];
+      style.setProperty('cursor', 'none', 'important');
+    };
+    cursorObserver = new MutationObserver(hideBrowserCursor);
+    cursorObserver.observe(input.element, {attributes: true, attributeFilter: ['style']});
+    hideBrowserCursor();
+  }
 
   function update() {
     const active = touch.matches && !viewer;
     root.classList.toggle('kdencut-mobile', active);
+    syncCursor();
     if (!active) return;
     const viewport = window.visualViewport;
     const width = viewport ? viewport.width : window.innerWidth;
@@ -62,6 +101,8 @@
   window.visualViewport?.addEventListener('resize', schedule);
   window.visualViewport?.addEventListener('scroll', schedule);
   touch.addEventListener('change', schedule);
+  // The streaming input is recreated on reconnect, after this script loads.
+  new MutationObserver(syncCursor).observe(document.body, {childList: true, subtree: true});
   new ResizeObserver(schedule).observe(document.getElementById('app') || document.body);
   update();
 })();

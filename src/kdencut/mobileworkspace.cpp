@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL */
 #include "mobileworkspace.h"
+#include "mobilesettings.h"
+#include "mobilechrome.h"
+#include "touchscrolling.h"
+#include <KLocalizedString>
 
 #include <QAction>
 #include <QDialog>
@@ -85,21 +89,16 @@ QIcon touchIcon(const QString &name)
 
 void enableSwipe(QScrollArea *area)
 {
-    area->setProperty("kdencutScroller", true);
-    QScroller::grabGesture(area->viewport(), QScroller::LeftMouseButtonGesture);
-    auto *scroller = QScroller::scroller(area->viewport());
-    auto properties = scroller->scrollerProperties();
-    properties.setScrollMetric(QScrollerProperties::FrameRate, QScrollerProperties::Fps60);
-    properties.setScrollMetric(QScrollerProperties::DecelerationFactor, 0.12);
-    properties.setScrollMetric(QScrollerProperties::HorizontalOvershootPolicy, QScrollerProperties::OvershootAlwaysOff);
-    properties.setScrollMetric(QScrollerProperties::VerticalOvershootPolicy, QScrollerProperties::OvershootAlwaysOff);
-    scroller->setScrollerProperties(properties);
+    enableSwipeScrolling(area, true);
 }
 } // namespace
 
 void MobileWorkspace::fitDialog(QDialog *dialog, const QRect &available)
 {
     if (!dialog || !dialog->layout()) {
+        return;
+    }
+    if (adaptProjectSettings(dialog, available)) {
         return;
     }
     const QSize limit(qMax(240, available.width() - 24), qMax(200, available.height() - 48));
@@ -136,6 +135,9 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
     , m_timeline(timeline)
 {
     setObjectName(QStringLiteral("mobileWorkspace"));
+    if (auto *window = qobject_cast<QMainWindow *>(parent)) {
+        new MobileChrome(window, this);
+    }
     QFont mobileFont = font();
     mobileFont.setPixelSize(14);
     setFont(mobileFont);
@@ -149,7 +151,7 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
     setStyleSheet(QStringLiteral(
         "#mobileWorkspace { background: #121212; color: #eeeeee; }"
         "#mobileWorkspace QLabel { color: #eeeeee; background: transparent; }"
-        "#mobileWorkspace QToolButton { min-width: 40px; min-height: 40px; padding: 2px 4px; border: 0; border-radius: 7px; background: transparent; color: #eeeeee; }"
+        "#mobileWorkspace QToolButton { min-width: 48px; min-height: 48px; padding: 2px 4px; border: 0; border-radius: 7px; background: transparent; color: #eeeeee; }"
         "#mobileWorkspace QToolButton:pressed { background: #28474a; }"
         "#mobileWorkspace QToolButton:disabled { color: #696969; }"
         "#mobileWorkspace QToolButton#mobileExport, #mobileWorkspace QToolButton#mobileNew { background: #08bfd0; color: #071719; font-weight: bold; }"
@@ -169,20 +171,21 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
     auto *editor = new QVBoxLayout(m_editor);
     editor->setContentsMargins(0, 0, 0, 0);
     editor->setSpacing(0);
-    auto *header = new QHBoxLayout;
+    auto *projectControls = new QWidget;
+    projectControls->setObjectName(QStringLiteral("mobileProjectControls"));
+    auto *header = new QHBoxLayout(projectControls);
     header->setContentsMargins(8, 4, 8, 4);
-    auto *home = button(tr("Home"), QStringLiteral("go-home"), QStringLiteral("home"), false);
+    auto *home = button(i18n("Home"), QStringLiteral("go-home"), QStringLiteral("home"), false);
     header->addWidget(home);
     auto *title = new QLabel(QStringLiteral("KdenCut"));
     title->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     header->addWidget(title, 1);
-    header->addWidget(button(tr("Media"), QStringLiteral("list-add"), QStringLiteral("media"), false));
-    header->addWidget(actionButton(QStringLiteral("file_save"), tr("Save"), QStringLiteral("document-save"), false));
-    auto *exportButton = actionButton(QStringLiteral("project_render"), tr("Export"), QStringLiteral("document-export"), false);
+    header->addWidget(button(i18n("Media"), QStringLiteral("list-add"), QStringLiteral("media"), false));
+    header->addWidget(actionButton(QStringLiteral("file_save"), i18n("Save"), QStringLiteral("document-save"), false));
+    auto *exportButton = button(i18n("Export"), QStringLiteral("document-export"), QStringLiteral("export"), false);
     exportButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
     exportButton->setObjectName(QStringLiteral("mobileExport"));
     header->addWidget(exportButton);
-    editor->addLayout(header);
 
     m_splitter = new QSplitter(Qt::Vertical);
     m_splitter->setObjectName(QStringLiteral("mobileSplitter"));
@@ -200,15 +203,15 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
     leftTransport->setFixedWidth(96);
     auto *leftButtons = new QHBoxLayout(leftTransport);
     leftButtons->setContentsMargins(0, 0, 0, 0);
-    leftButtons->addWidget(button(tr("Expand preview"), QStringLiteral("view-fullscreen"), QStringLiteral("preview"), false));
+    leftButtons->addWidget(button(i18n("Expand preview"), QStringLiteral("view-fullscreen"), QStringLiteral("preview"), false));
     leftButtons->addStretch();
     transport->addWidget(leftTransport);
     transport->addStretch();
-    m_play = button(tr("Play"), QStringLiteral("media-playback-start"), QStringLiteral("play"), false);
+    m_play = button(i18n("Play"), QStringLiteral("media-playback-start"), QStringLiteral("play"), false);
     transport->addWidget(m_play);
     transport->addStretch();
-    transport->addWidget(actionButton(QStringLiteral("edit_undo"), tr("Undo"), QStringLiteral("edit-undo"), false));
-    transport->addWidget(actionButton(QStringLiteral("edit_redo"), tr("Redo"), QStringLiteral("edit-redo"), false));
+    transport->addWidget(actionButton(QStringLiteral("edit_undo"), i18n("Undo"), QStringLiteral("edit-undo"), false));
+    transport->addWidget(actionButton(QStringLiteral("edit_redo"), i18n("Redo"), QStringLiteral("edit-redo"), false));
     monitorLayout->addLayout(transport);
     m_splitter->addWidget(monitor);
 
@@ -230,12 +233,12 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
     panelHeader->setContentsMargins(12, 0, 8, 0);
     m_panelTitle = new QLabel;
     panelHeader->addWidget(m_panelTitle, 1);
-    auto *done = button(tr("Done"), QStringLiteral("dialog-ok"), QStringLiteral("done"), false);
+    auto *done = button(i18n("Done"), QStringLiteral("dialog-ok"), QStringLiteral("done"), false);
     done->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     panelHeader->addWidget(done);
     panelLayout->addLayout(panelHeader);
-    m_mediaTools = toolStrip({button(tr("Import"), QStringLiteral("list-add"), QStringLiteral("import")),
-                             button(tr("Add to timeline"), QStringLiteral("insert-object"), QStringLiteral("insert"))});
+    m_mediaTools = toolStrip({button(i18n("Import"), QStringLiteral("list-add"), QStringLiteral("import")),
+                             button(i18n("Add to timeline"), QStringLiteral("insert-object"), QStringLiteral("insert"))});
     panelLayout->addWidget(m_mediaTools);
     m_panelScroll = new QScrollArea;
     m_panelScroll->setWidgetResizable(true);
@@ -250,26 +253,50 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
     m_tools = new QStackedWidget;
     m_tools->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     m_mainTools = toolStrip({
-        button(tr("Edit"), QStringLiteral("edit-cut"), QStringLiteral("edit")),
-        button(tr("Audio"), QStringLiteral("audio-x-generic"), QStringLiteral("audio")),
-        button(tr("Text"), QStringLiteral("draw-text"), QStringLiteral("text")),
-        button(tr("Effects"), QStringLiteral("tools-wizard"), QStringLiteral("effects")),
-        button(tr("Overlay"), QStringLiteral("overlay"), QStringLiteral("overlay")),
-        button(tr("Captions"), QStringLiteral("add-subtitle"), QStringLiteral("captions")),
-        button(tr("Filters"), QStringLiteral("filters"), QStringLiteral("filters")),
-        button(tr("Adjust"), QStringLiteral("configure"), QStringLiteral("adjust")),
-        button(tr("Transitions"), QStringLiteral("view-split-left-right"), QStringLiteral("transitions"))});
+        button(i18n("Edit"), QStringLiteral("edit-cut"), QStringLiteral("edit")),
+        button(i18n("Audio"), QStringLiteral("audio-x-generic"), QStringLiteral("audio")),
+        button(i18n("Text"), QStringLiteral("draw-text"), QStringLiteral("text")),
+        button(i18n("Effects"), QStringLiteral("tools-wizard"), QStringLiteral("effects")),
+        button(i18n("Overlay"), QStringLiteral("overlay"), QStringLiteral("overlay")),
+        button(i18n("Captions"), QStringLiteral("add-subtitle"), QStringLiteral("captions")),
+        button(i18n("Filters"), QStringLiteral("filters"), QStringLiteral("filters")),
+        button(i18n("Adjust"), QStringLiteral("configure"), QStringLiteral("adjust")),
+        button(i18n("Ratio"), QStringLiteral("transform-scale"), QStringLiteral("ratio")),
+        button(i18n("Transitions"), QStringLiteral("view-split-left-right"), QStringLiteral("transitions"))});
     m_editTools = toolStrip({
-        button(tr("Back"), QStringLiteral("go-previous"), QStringLiteral("tools")),
-        actionButton(QStringLiteral("cut_timeline_clip"), tr("Split"), QStringLiteral("edit-cut")),
-        actionButton(QStringLiteral("delete_timeline_selection"), tr("Delete"), QStringLiteral("edit-delete")),
-        actionButton(QStringLiteral("duplicate_timeline_clip"), tr("Duplicate"), QStringLiteral("edit-copy")),
-        actionButton(QStringLiteral("zoom_fit"), tr("Fit"), QStringLiteral("zoom-fit-best")),
-        actionButton(QStringLiteral("view_zoom_out"), tr("Zoom out"), QStringLiteral("zoom-out")),
-        actionButton(QStringLiteral("view_zoom_in"), tr("Zoom in"), QStringLiteral("zoom-in"))});
+        button(i18n("Back"), QStringLiteral("go-previous"), QStringLiteral("tools")),
+        actionButton(QStringLiteral("cut_timeline_clip"), i18n("Split"), QStringLiteral("edit-cut")),
+        actionButton(QStringLiteral("delete_timeline_selection"), i18n("Delete"), QStringLiteral("edit-delete")),
+        actionButton(QStringLiteral("duplicate_timeline_clip"), i18n("Duplicate"), QStringLiteral("edit-copy")),
+        actionButton(QStringLiteral("edit_item_speed"), i18n("Speed"), QStringLiteral("speedometer")),
+        button(i18n("Volume"), QStringLiteral("audio-volume-high"), QStringLiteral("volume")),
+        actionButton(QStringLiteral("zoom_fit"), i18n("Fit"), QStringLiteral("zoom-fit-best")),
+        actionButton(QStringLiteral("view_zoom_out"), i18n("Zoom out"), QStringLiteral("zoom-out")),
+        actionButton(QStringLiteral("view_zoom_in"), i18n("Zoom in"), QStringLiteral("zoom-in"))});
     m_tools->addWidget(m_mainTools);
     m_tools->addWidget(m_editTools);
+    auto *ratios = toolStrip({button(i18n("Back"), QStringLiteral("go-previous"), QStringLiteral("tools")),
+        button(QStringLiteral("9:16"), QStringLiteral("transform-scale"), QStringLiteral("ratio-portrait")),
+        button(QStringLiteral("1:1"), QStringLiteral("transform-scale"), QStringLiteral("ratio-square")),
+        button(QStringLiteral("16:9"), QStringLiteral("transform-scale"), QStringLiteral("ratio-landscape"))});
+    auto *exports = toolStrip({button(i18n("Back"), QStringLiteral("go-previous"), QStringLiteral("tools")),
+        button(QStringLiteral("TikTok"), QStringLiteral("document-export"), QStringLiteral("export-TikTok")),
+        button(QStringLiteral("Reels"), QStringLiteral("document-export"), QStringLiteral("export-Reels")),
+        button(QStringLiteral("Shorts"), QStringLiteral("document-export"), QStringLiteral("export-Shorts")),
+        actionButton(QStringLiteral("project_render"), i18n("Advanced"), QStringLiteral("configure"))});
+    m_tools->addWidget(ratios);
+    m_tools->addWidget(exports);
+    connect(this, &MobileWorkspace::command, this, [this, ratios, exports](const QString &name) {
+        if (name == QLatin1String("ratio") || name == QLatin1String("export")) {
+            m_lower->show();
+            m_tools->show();
+            m_tools->setCurrentWidget(name == QLatin1String("ratio") ? ratios : exports);
+        }
+    });
     m_tools->setFixedHeight(qMax(m_mainTools->height(), m_editTools->height()));
+    // The preview is the first row. Keep project actions reachable alongside
+    // the bottom editing tools instead of using a header above the video.
+    editor->addWidget(projectControls);
     editor->addWidget(m_tools);
     m_pages->addWidget(m_editor);
 
@@ -282,15 +309,15 @@ MobileWorkspace::MobileWorkspace(QWidget *preview, QWidget *timeline, const QMap
     brandFont.setBold(true);
     brand->setFont(brandFont);
     homeLayout->addWidget(brand);
-    homeLayout->addWidget(new QLabel(tr("Your next video starts here.")));
+    homeLayout->addWidget(new QLabel(i18n("Your next video starts here.")));
     homeLayout->addSpacing(24);
-    auto *newVideo = button(tr("New video"), QStringLiteral("list-add"), QStringLiteral("new"));
+    auto *newVideo = button(i18n("New video"), QStringLiteral("list-add"), QStringLiteral("new"));
     newVideo->setObjectName(QStringLiteral("mobileNew"));
     homeLayout->addWidget(newVideo);
-    homeLayout->addWidget(actionButton(QStringLiteral("file_open"), tr("Open project"), QStringLiteral("document-open")));
-    homeLayout->addWidget(button(tr("Continue editing"), QStringLiteral("go-next"), QStringLiteral("continue")));
+    homeLayout->addWidget(actionButton(QStringLiteral("file_open"), i18n("Open project"), QStringLiteral("document-open")));
+    homeLayout->addWidget(button(i18n("Continue editing"), QStringLiteral("go-next"), QStringLiteral("continue")));
     homeLayout->addStretch();
-    homeLayout->addWidget(actionButton(QStringLiteral("kdencut_touch_mode"), tr("Desktop controls"), QStringLiteral("video-display")));
+    homeLayout->addWidget(actionButton(QStringLiteral("kdencut_touch_mode"), i18n("Desktop controls"), QStringLiteral("video-display")));
     auto *homeScroll = new QScrollArea;
     homeScroll->setWidgetResizable(true);
     homeScroll->setWidget(homePage);
@@ -322,12 +349,12 @@ QToolButton *MobileWorkspace::button(const QString &text, const QString &icon, c
     b->setToolTip(text);
     b->setAccessibleName(text);
     b->setIcon(touchIcon(icon));
-    b->setIconSize(QSize(24, 24));
+    b->setIconSize(QSize(28, 28));
     b->setToolButtonStyle(label ? Qt::ToolButtonTextUnderIcon : Qt::ToolButtonIconOnly);
     b->setFocusPolicy(Qt::NoFocus);
     if (label) {
         QFont labelFont = font();
-        labelFont.setPixelSize(12);
+        labelFont.setPixelSize(14);
         b->setFont(labelFont);
         b->setStyleSheet(QStringLiteral("min-width: %1px;").arg(qMax(48, b->fontMetrics().horizontalAdvance(text) + 12)));
     }
@@ -368,7 +395,7 @@ QWidget *MobileWorkspace::toolStrip(const QList<QWidget *> &buttons)
     scroll->setWidget(contents);
     // Font/style propagation happens after these controls enter the stacked
     // workspace. Reserve room for both the icon and its label before that.
-    scroll->setFixedHeight(qMax(72, contents->sizeHint().height() + 2));
+    scroll->setFixedHeight(qMax(80, contents->sizeHint().height() + 2));
     enableSwipe(scroll);
     return scroll;
 }
@@ -397,10 +424,10 @@ void MobileWorkspace::showEditTools() { m_tools->setCurrentWidget(m_editTools); 
 void MobileWorkspace::setPlaying(bool playing)
 {
     m_play->setIcon(touchIcon(playing ? QStringLiteral("media-playback-pause") : QStringLiteral("media-playback-start")));
-    m_play->setAccessibleName(playing ? tr("Pause") : tr("Play"));
+    m_play->setAccessibleName(playing ? i18n("Pause") : i18n("Play"));
     m_play->setToolTip(m_play->accessibleName());
 }
-void MobileWorkspace::setTimecode(const QString &timecode) { setAccessibleDescription(tr("Playhead %1").arg(timecode)); }
+void MobileWorkspace::setTimecode(const QString &timecode) { setAccessibleDescription(i18n("Playhead %1", timecode)); }
 QSize MobileWorkspace::sizeHint() const { return QSize(430, 820); }
 QSize MobileWorkspace::minimumSizeHint() const { return QSize(280, 280); }
 

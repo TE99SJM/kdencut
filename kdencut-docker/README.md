@@ -1,144 +1,288 @@
-# KdenCut on a server (Docker, use it in a browser)
+# KdenCut in Docker
 
-Runs KdenCut inside a web desktop (linuxserver Selkies, Ubuntu 26.04) so you can edit from
-any browser or touchscreen tablet on your network. Sound plays in the browser.
+KdenCut runs in a Selkies web desktop on Ubuntu 26.04. Open it from a phone, tablet
+or desktop browser; audio plays in the browser. See the [workspace overview](../KDENCUT.md).
 
-## Install
+## New installation
 
 ```bash
-git clone -b kdencut-touch-capcut https://github.com/TE99SJM/kdencut.git ~/kdencut
-cd ~/kdencut/kdencut-docker
+git clone -b kdencut-phone-completion https://github.com/TE99SJM/kdencut.git ~/kdencut-src
+cd ~/kdencut-src/kdencut-docker
 cp .env.example .env
-nano .env                    # set PUID/PGID (run: id), PASSWORD, MEDIA_DIR
-docker compose up -d --build # first build compiles MLT + KdenCut: 30-90 minutes
-docker compose logs -f       # Ctrl+C to stop watching
+nano .env
+docker compose build
+docker compose up -d
 ```
 
-Open **https://SERVER-IP:3007** (accept the self-signed certificate warning).
-Your videos are in `/media` inside the file dialogs.
+For a new installation, set PUID/PGID to the owner of the storage folders (`id`),
+choose CONFIG_DIR and MEDIA_DIR, and configure CUSTOM_USER/PASSWORD. Existing
+installations keep their `.env`. Defaults remain HTTP **3006 → 3000**, HTTPS
+**3007 → 3001**, and the same `/config` and `/media` volume mappings.
+Open **https://SERVER-IP:3007** and accept the local certificate if appropriate.
+Keep the web desktop behind your private network/Tailscale or suitable access
+controls: it includes a server terminal. The media API uses the editor's login.
 
-## Update after new commits
+The first build downloads build dependencies, CPU PyTorch, Whisper and its tiny
+model, then compiles MLT and KdenCut. Allow 30–90 minutes, several GB of downloads
+and substantial Docker build space. If memory is limited, use
+`docker compose build --build-arg BUILD_JOBS=2`; no `.env` edit is needed.
+
+## Update an existing server
+
+Save and close the project before recreating the container. From the checkout
+shown in the server screenshots:
 
 ```bash
-cd ~/kdencut && git pull
-cd kdencut-docker && docker compose up -d --build
+cd ~/kdencut-src
+git fetch origin
+git switch kdencut-phone-completion
+git pull --ff-only origin kdencut-phone-completion
+cd kdencut-docker
+docker compose build --build-arg BUILD_JOBS=2
+docker compose up -d --force-recreate
+docker compose ps
 ```
 
-Settings and projects in `CONFIG_DIR` are kept.
+The first `git switch` creates a local tracking branch from the fetched remote.
+If Git reports local tracked changes, preserve them and resolve that warning;
+do not reset or clean the checkout. This update does not replace `.env` or clear
+settings, projects or media. Keep any existing local Compose overrides/mounts.
+Reload the browser page after rebuilding; browser assets have versioned URLs.
+A build alone does not replace the running container.
 
-## Remove
+If using the generated GPU override below, include the base file, any existing
+local override, and the GPU file with `-f` for every Compose build/up/down command.
+For example, if `compose.override.yaml` holds your NAS mounts, keep it between
+`-f compose.yaml` and `-f compose.gpu.generated.yaml`; explicit file lists otherwise omit it.
+To roll back the code, switch to `kdencut-touch-capcut`,
+rebuild and recreate using the same volumes. Back up project files before testing
+new upstream versions; returning to older code does not undo saved project edits.
+
+## Phone workspace
+
+Portrait places preview above timeline; landscape puts them side by side. The
+video preview starts at the top, without desktop menus, workspace tabs or toolbars.
+Home, Media, Save and Export sit below the timeline, just above the bottom editing
+strip. Edit, Audio, Text, Effects, Overlay, Captions, Filters and Adjust use pictures
+with labels. Swipe the strip for additional tools. Saved desktop settings do not
+bring the top bars back; Home > Desktop controls restores the desktop bars.
+Edit offers Split, Delete, Duplicate, Speed, Volume, Fit and zoom. Tap a clip first;
+volume uses its audio selection. Ratio offers 9:16, 1:1 and 16:9 while preserving
+frame rate. Audio, titles and overlays insert on an empty matching track.
+
+Swipe to scrub, hold a clip then drag to move, and drag its large edge handles to
+trim. Browser input is mouse-compatible; use zoom buttons in the streamed editor.
+Native touchscreen pinch stays safe even with an empty timeline. Secondary panels
+and large desktop dialogs scroll within the phone viewport. The keyboard button
+has its own bottom strip; rotation and the software keyboard resize the stream.
+Administrator-pinned display settings are respected. Phone and tablet browsers hide
+the separate streaming mouse pointer without changing taps or drags, including
+when the session reconnects. Desktop browsers retain their cursor behavior.
+
+Project Settings uses dropdowns for its section, project preset and project-folder
+choice. Fields stack vertically, including proxy settings. Swipe up/down to scroll;
+OK and Cancel remain visible below the page. Existing dropdowns still control frame
+rate, scanning, codecs and audio channels. Buttons have larger touch targets, and
+numeric +/- controls sit beside each other instead of tiny stacked arrows. Lists
+and read-only panels use smooth scrolling with momentum; editable text, clip
+reordering and timeline trimming retain their editing gestures.
+
+Home > Desktop controls restores the desktop docks. View > Touch Mode returns to
+the phone layout. In a desktop browser, View > Show Mouse Cursor reveals the native
+editor pointer. The phone/tablet browser continues to hide its streaming pointer.
+Settings > Color Theme supports both dark and light palettes, including inputs.
+
+**Export > TikTok / Reels / Shorts** starts a 1080×1920 progressive H.264/AAC MP4
+in `/media/exports`, with a unique filename, stereo 48 kHz audio and fast-start
+playback. The project frame rate is retained. Kdenlive's vertical export framing
+is used without changing the project canvas; use Ratio > 9:16 to review composition
+before exporting. These presets do not publish to social accounts. Normal warnings
+about variable-frame-rate clips, muted audio or missing media may still require
+attention. Advanced opens the normal export dialog and software/GPU preset choices.
+
+## Media chooser and phone uploads
+
+Media > Import, Add video, Audio and Overlay open a portrait-friendly browser
+chooser. Source and folder controls sit above a vertical list; filenames wrap,
+sizes remain readable and Add selected stays visible while scrolling.
+
+- **This device > Photos / Videos** opens the phone's standard library picker.
+- **Browse Files** opens its file picker, including providers available on the phone.
+- **Server / NAS** browses `/media`, previous imports and saved SMB connections.
+- **Open server file picker** provides the original server-side dialog.
+
+Uploads use **1 MiB chunks**, a progress bar and offsets persisted on the server.
+A dropped connection triggers three retries with increasing delays. If it stays
+offline, restore connectivity and tap **Retry upload**. The server acknowledges
+already-written chunks without duplicating them. After a page reload, reselect
+the same files to resume the still-open import; the browser cannot retain access
+to phone files across reloads. File identity uses metadata and sampled bytes for
+resume matching, not a full-file integrity checksum.
+
+Keep the project/import open until completion. Cancelling removes unfinished
+copies; closing or switching the project invalidates its pending handoff. Server
+transfer metadata survives a media-service restart, but a full editor/container
+restart closes the native import request, so reselect/start a new import then.
+Each file is limited to 100 GiB and checked against available space. Files stream
+to disk; only one bounded chunk is buffered at a time.
+
+## NAS imports
+
+Use **+ NAS** for an SMB2/SMB3 hostname or IPv4 address, share name, optional
+username/password and optional nonstandard port (default 445). For `\\MNAS\Video`,
+enter `MNAS` and `Video`. Credentials are validated and stored in an owner-only
+server file; passwords are not returned to the browser. **Forget** removes the
+connection without deleting imported media.
+
+Selected NAS files download into local persistent import storage before editing.
+Transfers show progress and can be cancelled. SMB downloads currently restart
+after failure; chunked resume applies to phone uploads. NAS originals are never
+changed or deleted. No privileged container or host SMB mount is required.
+
+Files already under `/media` import in place. NFS and other host-mounted storage
+work through your existing `/media` mapping or server file picker; the app does
+not mount NFS itself. Use the host's existing mount/permissions and retain your
+Compose overrides. Hostname resolution must work from inside the container.
+
+## Storage cleanup
+
+Uploads and downloaded NAS files live in
+`CONFIG_DIR/KdenCut/Imports` (`/config/KdenCut/Imports` inside Docker), each in a
+unique folder. Moving or deleting these files manually can break projects.
+The chooser displays available import-storage space, with **Low storage** below
+2 GiB or 5% of that filesystem's total capacity, whichever is larger. This is the
+`/config` filesystem; exports under `/media` may use another filesystem.
+
+Open **Server / NAS > Storage** to review unused imports:
+
+1. Confirm that every project using these imports is stored under `/config` or
+   `/media`. Projects on disconnected storage, elsewhere on the server, in archives,
+   or on other machines cannot be checked. Bring them into those locations first,
+   or keep the imports. The same applies to historical copies you intend to restore.
+2. Review unused imports. The service checks `.kdenlive`/`.mlt` files, project
+   backups/autosaves and a fresh snapshot of the open project's bin, including
+   unsaved clips. Unreadable/malformed projects, unavailable locations, linked
+   project folders or an unavailable editor block cleanup.
+3. Select files and move them to **recoverable Trash**. Usage is checked again.
+   Only application-owned imports at least 24 hours old are eligible. Active
+   transfers, symlinks, unexpected folder contents and legacy unmarked imports
+   are excluded. Server files imported in place and NAS originals are excluded.
+4. Use **Recover deleted imports** to restore their original paths. Trash consumes
+   space until **Permanently delete trash** is confirmed. That operation rechecks
+   project usage again and cannot be undone. There is no automatic purge.
+
+Cleanup cannot inspect arbitrary external projects or guarantee future undo/history
+operations will not want an older asset. Keep recoverable copies until satisfied;
+restore a trashed import before reopening an older project that needs it.
+
+## Optional GPU support
+
+The base Compose file works without a GPU. Its ports, volumes and `.env` settings
+are unchanged. Generate an optional override **on the Docker host**:
 
 ```bash
-cd ~/kdencut/kdencut-docker && docker compose down
+cd ~/kdencut-src/kdencut-docker
+python3 configure-gpu.py
+docker compose -f compose.yaml -f compose.gpu.generated.yaml config --quiet
+docker compose -f compose.yaml -f compose.gpu.generated.yaml up -d --force-recreate
 ```
 
-## Notes
-- If the build is killed (out of memory), set `BUILD_JOBS=2` in `.env` and run the build again.
-- The mouse cursor is hidden on purpose. Right-click the desktop (outside KdenCut) and choose
-  **KdenCut (show cursor)**, or use **View > Show Mouse Cursor**.
-- Through the browser, taps act as clicks. Two-finger pinch-zoom on the timeline needs a
-  touchscreen attached directly to a Linux PC; in the browser use Edit > Zoom in / Zoom out.
-- The web desktop includes a terminal with root access. Keep it on your home network or
-  Tailscale, and always set `CUSTOM_USER` and `PASSWORD`.
+Run the detector as a user who can run `docker info`. It chooses NVIDIA only when
+`nvidia-smi` works and Docker has the NVIDIA runtime, otherwise Intel/AMD render
+nodes under `/dev/dri`, otherwise software. The generated file is ignored by Git.
+It adds GPU devices/runtime/environment only. Use the same two `-f` arguments for
+future builds and updates. Regenerate the override after hardware/driver changes;
+Docker cannot start a stale device/runtime mapping before the app can fall back.
 
-## Phone display fixes
+| Backend | Host prerequisites | Compose additions |
+| --- | --- | --- |
+| Intel / AMD VAAPI | Working host DRM driver and `/dev/dri/renderD*` | `/dev/dri` device mapping, render-node selection |
+| NVIDIA | NVIDIA driver and NVIDIA Container Toolkit configured for Docker | NVIDIA runtime, GPU reservation and driver capabilities |
+| Software | None | No device mapping or runtime requirement |
 
-### Phone uploads and NAS storage
+For manual configuration, [compose.vaapi.yaml](compose.vaapi.yaml) and
+[compose.nvidia.yaml](compose.nvidia.yaml) are examples. Use one alongside
+`compose.yaml`. The VAAPI example selects `renderD128`; adjust it if the desired
+node is different. The detector selects the first available render node, while
+the editor probe tries the mapped nodes. For NVIDIA browser-stream acceleration,
+a corresponding DRM render node may also be needed; the generated override maps
+`/dev/dri` when present. Host drivers/toolkit installation is separate from building
+this image. See [Docker GPU support](https://docs.docker.com/compose/how-tos/gpu-support/)
+and [Selkies GPU requirements](https://docs.linuxserver.io/selkies/user-guide/gpu/).
 
-In the touch workspace, **Media > Import**, **Add video**, **Audio**, and **Overlay**
-open a portrait-friendly browser media chooser on **Server / NAS**. Storage and
-folder controls sit above a single vertical file list, with file sizes under
-wrapping filenames and a full-width **Add selected** button that stays in view
-while scrolling. **This device > Photos / Videos** uses the phone's
-native library picker; **Browse Files** opens the device's standard file picker.
-Select several files at once. Progress is shown while their bytes upload to the
-server, and completed files are added to the project/timeline. Cancelling the
-native picker leaves the chooser open. Cancelling an import removes unfinished
-copies. Keep the project open until the import finishes.
-
-**Server / NAS** lists the existing `/media` mount and prior uploaded/downloaded
-media. Use **+ NAS** to save an SMB2/SMB3 connection: a hostname or IPv4 address,
-share name, and optional username/password. For `\\\\MNAS\\Video`, enter `MNAS`
-as the address and `Video` as the share. Credentials are checked before saving,
-kept in an owner-only server file, and never returned to the browser. **Forget**
-removes the saved connection without deleting imported media.
-
-Direct SMB connections default to port 445 (custom ports are supported) and download selected files into persistent
-local storage before importing them. No host mount or privileged container is
-needed. Files already mounted under `/media` can be imported in place. NFS and
-other host-mounted storage remain usable through that mount or **Open server file
-picker**. The app does not mount NFS shares itself.
-
-Uploads and SMB copies live under `CONFIG_DIR/KdenCut/Imports`, each in a unique
-folder so equal filenames never overwrite one another. Retain those files while
-a project references them. NAS originals are only read, never changed or deleted.
-Insufficient disk space, disconnected shares, and failed transfers are reported
-in the chooser. Each file can be up to 100 GiB; available server disk space is
-checked before transfer. Uploads are streamed to disk rather than held in RAM.
-
-The chooser and its API use the same origin and login as the editor. Rebuild and
-recreate the container, then reload the browser after updating. The browser tests
-exercise native file-input activation, multiple file uploads, folder selection,
-phone sizing, and cancellation. CI also tests a real local SMB2 share and the
-compiled native project-lifetime bridge; an iPhone and the actual NAS still need
-an installation check.
-
-Touch clients reserve a separate bottom strip for the keyboard button and fit the
-stream to Safari's visible viewport, including rotation and the software keyboard.
-The streamed desktop now uses phone-sized logical pixels at 96 DPI (minimum
-320×280). It no longer creates a 960-pixel desktop and shrinks its controls.
-Selkies scales the stream and pointer coordinates together. Administrator-pinned
-resolution/DPI settings are respected.
-
-Touch Mode uses the full-screen editing workspace at every screen size. The project preview sits above the timeline in
-portrait; landscape places them side by side. The swipeable bottom strip contains
-Edit, Audio, Text, Effects, Overlay, Captions, Filters, Adjust and Transitions.
-Media, Save and Export stay at the top, with playback and undo/redo below the preview.
-Edit opens Split, Delete, Duplicate, Fit and zoom controls. Importing media inserts it into the active
-matching track; the Media sheet can also insert selected bin clips.
-Audio, Text and Overlay imports use an empty matching track, creating one when needed,
-so added music and titles do not collide with existing clips.
-
-The touch timeline keeps a white playhead centered while thumbnail strips scroll
-under it. Swipe to scrub with momentum; tap a clip to select it. Hold a clip before
-dragging to move it, or drag its large white edge handles to trim. Each completed
-move or trim uses the existing undoable timeline operation. Empty tracks are hidden;
-Add video, Add audio and Add text remain directly accessible. Track scrolling and
-tool strips accept mouse drags from the browser as well as direct touch.
-
-The mobile home has New video, portrait/landscape format selection, Open project,
-and recent projects. Home inside the editor offers Continue editing and Desktop
-controls. Secondary dock panels open as scrollable sheets. Oversized desktop
-forms, including export settings, scroll within the available screen. Advanced
-forms still use their existing Kdenlive controls.
-
-Home > Desktop controls restores the previous desktop layout. Upgrading to this
-reskin enables Touch Mode once for existing profiles; a later Desktop choice is
-remembered. Project saves retain that desktop layout; loading projects and changing
-project aspect ratio cannot restore desktop docks over the phone workspace.
-Quick Setup and recovery screens remain available.
-
-Rebuild the image after pulling this change and reload the browser page to load the
-new viewport adapter. Asset URLs are versioned so the browser fetches changed files. No configuration reset is needed. This does not install the
-optional Glaxnimate/Lottie module shown in the startup warning.
-
-Developer checks:
+At editor startup a real FFmpeg H.264 encode runs as the editor user. Only a working
+encoder enables the corresponding MLT preview decoder and social export encoder.
+A failed probe clears stale acceleration settings and uses libx264/software.
+Unsupported source codecs can fall back to software decoding. Effects, compositing
+and CPU Whisper are not all GPU-accelerated. Check the selected backend with:
 
 ```bash
-node --test kdencut-docker/tests/test_mobile_logic.cjs
-python kdencut-docker/tests/check_splash.py        # requires PySide6
-python kdencut-docker/tests/test_mobile_viewport.py # requires Playwright + Chromium
-cmake -S kdencut-docker/tests/native -B /tmp/kdencut-mobile-checks # Qt6 Widgets + QuickWidgets + Test
+docker exec kdencut cat /config/.local/share/kdencut/hardware.json
+```
+
+To force software without editing `.env`:
+
+```bash
+python3 configure-gpu.py --mode software
+docker compose -f compose.yaml -f compose.gpu.generated.yaml up -d --force-recreate
+```
+
+An encoder can still fail later because of a driver reset or format limitation;
+select a software preset in Advanced export in that case. Startup probing is not
+an automatic retry of failed render jobs.
+
+## Packaged effects and captions
+
+| Capability | Included implementation | Where to use it |
+| --- | --- | --- |
+| Stabilization | MLT vidstab | Kdenlive clip stabilization job |
+| Audio noise reduction | RNNoise 0.2 + MLT rnnoise | RNNoise audio effect |
+| Motion tracking | MLT OpenCV tracker | Motion tracker effect |
+| Lottie playback | MLT Glaxnimate Qt6 module | Import Lottie/JSON animation files |
+| Auto-captions | OpenAI Whisper + multilingual tiny model | Phone Captions button |
+
+MLT's pinned Glaxnimate source and RNNoise are built in the image. The separate
+Glaxnimate authoring GUI is not installed. Accepted animation extensions include
+`.json`, `.lottie`, `.rawr`, `.tgs` and `.lot`; actual format support depends on the
+packaged Glaxnimate importer. Experimental MOVIT remains disabled.
+
+Whisper has an isolated Python environment in `/opt/kdencut-speech`; its bundled
+model lives in `/opt/kdencut-models` and is linked into the persistent Whisper cache.
+The first upgrade selects CPU, tiny and FP32, with full-timeline captioning.
+Later user model/language/device preferences are preserved. Larger models can be
+chosen in Kdenlive's speech settings and require download/storage/time. CPU tiny
+is intended to work on GPU-free hosts, not to give the best transcription quality.
+
+## Automated checks and manual acceptance
+
+GitHub Actions builds the production image, including application QML lint and
+C++ compilation. It runs unit tests for uploads, cleanup and GPU fallback; browser
+tests for native file-picker activation, dropped upload replies and vertical
+layout; a real SMB share test; native Qt tests for workspace behavior, themes,
+gettext translations and presets; and an offline Whisper/MLT packaging test.
+
+Useful local checks from the repository root:
+
+```bash
+node --test kdencut-docker/tests/test_*.cjs
+python3 -m unittest discover -s kdencut-docker/tests -p test_resumable_uploads.py -v
+python3 -m unittest discover -s kdencut-docker/tests -p test_import_cleanup.py -v
+python3 -m unittest discover -s kdencut-docker/tests -p test_gpu.py -v
+python3 -m unittest discover -s kdencut-docker/tests -p test_docs.py -v
+cmake -S kdencut-docker/tests/native -B /tmp/kdencut-mobile-checks
 cmake --build /tmp/kdencut-mobile-checks
 QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software ctest --test-dir /tmp/kdencut-mobile-checks --output-on-failure
 ```
 
-The browser checks cover container geometry and the Selkies message contract with
-a simulated stream; a rebuilt container and an iPhone are still needed for end-to-end
-validation of native docks, video streaming and touch input.
+Native checks require Qt6 Widgets/QuickWidgets/Test/Xml, KF6 I18n and Python.
+Browser checks additionally require Playwright/Chromium; SMB checks require
+smbprotocol and impacket. The workflow records exact setup commands.
 
-The native checks compile the actual mobile workspace and exercise portrait,
-landscape, keyboard-height viewports, action enablement, panel ownership and
-scrollable dialog acceptance. They also load the real touch QML with hierarchical
-clip data and check swipe-to-scrub, hold-to-move and trim-on-release. GitHub Actions also builds the production Dockerfile,
-which runs the application's QML lint and C++ compilation before running these checks.
+On a real phone **and** tablet, check portrait/landscape and keyboard resizing;
+Photos/Files upload with a brief network interruption; a real NAS download;
+trim/split/speed/volume with undo; all three ratios; caption generation from speech;
+and each social export (including sound and downloaded playback). Test a light
+color theme. Review/restore an eligible unused import and verify a referenced one
+is protected. Check GPU status and a short export on each host you intend to use;
+CI does not have your GPU, iOS photo library or NAS.
+
