@@ -130,4 +130,4 @@ small lifecycle/dock hooks to make later upstream merges easier.
 
 ## DJI Osmo 360
 
-Open an original `.OSV` with **Add Clip** to launch the [Osmo 360 editor](data/scripts/osmo360/README.md). Drag to reframe, set camera keyframes and render a flat or interactive 360° clip back into KdenCut. Choose **Save edit** to keep a camera track you can reopen.
+Drop an original `.OSV` from your file manager onto the **Project Bin**, or use **Add Clip**, to launch the native C++/Qt [Osmo 360 editor](data/scripts/osmo360/README.md). Drag to reframe, set camera keyframes and render a flat or interactive 360° clip back into KdenCut. Choose **Save edit** to keep a camera track you can reopen.

@@ -3,6 +3,7 @@
 
 #include <KLocalizedString>
 #include <KMessageBox>
+#include <QCoreApplication>
 #include <QEventLoop>
 #include <QFileInfo>
 #include <QJsonDocument>
@@ -12,19 +13,15 @@
 
 QString KdenCut::prepareOsmo360Clip(const QString &source, QWidget *parent)
 {
-    const auto script = QStandardPaths::locate(QStandardPaths::AppDataLocation, QStringLiteral("scripts/osmo360/editor.py"));
-    auto python = QStandardPaths::findExecutable(QStringLiteral("python3"));
-    if (python.isEmpty()) {
-        python = QStandardPaths::findExecutable(QStringLiteral("python"));
-    }
+    const auto editor = QStandardPaths::findExecutable(QStringLiteral("osmo360-editor"), {QCoreApplication::applicationDirPath()});
     QString error;
-    if (script.isEmpty() || python.isEmpty()) {
-        error = i18n("The Osmo 360 editor or Python is missing.");
+    if (editor.isEmpty()) {
+        error = i18n("The native Osmo 360 editor is missing from the KdenCut installation.");
     } else {
         QProcess child;
         QEventLoop loop;
         QObject::connect(&child, &QProcess::finished, &loop, &QEventLoop::quit);
-        child.start(python, {script, QStringLiteral("--integrated"), source});
+        child.start(editor, {QStringLiteral("--integrated"), source});
         if (child.waitForStarted()) {
             // The separate editor owns the interaction. The parent can repaint while
             // the current import's bin folder, callback and undo group stay intact.
