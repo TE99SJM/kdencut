@@ -6,7 +6,7 @@ import math
 import os
 import tempfile
 from bisect import bisect_right
-from dataclasses import astuple, dataclass
+from dataclasses import astuple, dataclass, replace
 from pathlib import Path
 
 
@@ -50,20 +50,77 @@ def interpolate(keys, frame, positions=None):
     )
 
 
+@dataclass(frozen=True)
+class RollKey:
+    angle: float
+    smooth: bool = False  # Older edits interpolated into each roll key.
+
+    def __post_init__(self):
+        if not -180 <= self.angle <= 180 or type(self.smooth) is not bool:
+            raise ValueError("Invalid roll key.")
+
+
+@dataclass
+class CameraTrack:
+    aim: dict[int, View]
+    rolls: dict[int, RollKey]
+    pan_only: bool = True
+
+    @classmethod
+    def from_legacy(cls, keys):
+        return cls(
+            {f: replace(v, roll=0) for f, v in keys.items()},
+            {f: RollKey(v.roll, True) for f, v in keys.items()},
+            pan_only=False,
+        )
+
+    def copy(self):
+        return CameraTrack(self.aim.copy(), self.rolls.copy(), self.pan_only)
+
+    def frames(self):
+        return self.aim.keys() | self.rolls.keys()
+
+    def keyframes(self):
+        """Combine the independent channels for the existing preview and renderer."""
+        roll_curve = {}
+        previous = View()
+        for frame, key in sorted(self.rolls.items()):
+            if frame > 0 and not key.smooth:
+                # One frame separates a held angle from its new value.
+                roll_curve.setdefault(frame - 1, previous)
+            previous = View(roll=key.angle)
+            roll_curve[frame] = previous
+        if not roll_curve:
+            return self.aim.copy()
+        aim_frames = sorted(self.aim)
+        roll_frames = sorted(roll_curve)
+        return {
+            frame: replace(
+                interpolate(self.aim, frame, aim_frames),
+                roll=interpolate(roll_curve, frame, roll_frames).roll,
+            )
+            for frame in self.aim.keys() | roll_curve.keys()
+        }
+
+
 def save_edit(path, clip, keys, mode):
     path = Path(path)
     try:
         source = os.path.relpath(clip.path, path.parent)
     except ValueError:  # different Windows drive
         source = str(clip.path)
+    track = keys if isinstance(keys, CameraTrack) else None
+    poses = track.aim if track else keys
     obj = dict(
-        version=1,
+        version=2 if track else 1,
         source=source,
         fps=str(clip.fps),
         frames=clip.frames,
         mode=mode,
-        keys={i: astuple(v) for i, v in keys.items()},
+        keys={i: astuple(v) for i, v in poses.items()},
     )
+    if track:
+        obj.update(pan_only=track.pan_only, rolls={i: astuple(k) for i, k in track.rolls.items()})
     with tempfile.NamedTemporaryFile("w", dir=path.parent, delete=False, encoding="utf8") as tmp:
         tmp_path = Path(tmp.name)
         try:
@@ -74,28 +131,40 @@ def save_edit(path, clip, keys, mode):
             tmp_path.unlink(missing_ok=True)
 
 
-def load_edit(path):
+def load_track(path):
     from media import open_clip
 
     path = Path(path).resolve()
     if path.suffix.lower() != ".k360":
-        return open_clip(path), {0: View()}, "Landscape"
+        return open_clip(path), CameraTrack({0: View()}, {}), "Landscape"
     data = json.loads(path.read_text(encoding="utf8"))
-    if data.get("version") != 1:
+    if data.get("version") not in (1, 2):
         raise ValueError("This 360 edit uses an unsupported version.")
     clip = open_clip(path.parent / data["source"])
     keys = {int(i): View(*v) for i, v in data["keys"].items()}
+    if data["version"] == 1:
+        track = CameraTrack.from_legacy(keys)
+    else:
+        rolls = {int(i): RollKey(*v) for i, v in data["rolls"].items()}
+        if type(data["pan_only"]) is not bool or any(v.roll != 0 for v in keys.values()):
+            raise ValueError("Invalid camera track.")
+        track = CameraTrack(keys, rolls, data["pan_only"])
     if (
         not keys
-        or min(keys) < 0
-        or max(keys) >= clip.frames
+        or min(track.frames()) < 0
+        or max(track.frames()) >= clip.frames
         or str(clip.fps) != data["fps"]
         or clip.frames != data["frames"]
     ):
         raise ValueError("The source recording no longer matches the saved camera track.")
     if data["mode"] not in MODES:
         raise ValueError("Unsupported output shape.")
-    return clip, keys, data["mode"]
+    return clip, track, data["mode"]
+
+
+def load_edit(path):
+    clip, track, mode = load_track(path)
+    return clip, track.keyframes(), mode
 
 
 MODES = {"Landscape": (16, 9), "Portrait": (9, 16), "Square": (1, 1), "360 panorama": (2, 1)}

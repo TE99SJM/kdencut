@@ -11,10 +11,11 @@ import tempfile
 import threading
 import time
 import tkinter as tk
+from dataclasses import replace
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from camera import MODES, View, interpolate, load_edit, save_edit, wrap
+from camera import MODES, RollKey, View, interpolate, load_track, save_edit, wrap
 from engine import (
     Cancelled,
     Job,
@@ -29,7 +30,8 @@ from engine import (
 class Editor:
     def __init__(self, root, source, output, folder):
         self.root = root
-        self.clip, self.keys, mode = load_edit(source)
+        self.clip, self.track, mode = load_track(source)
+        self.keys = self.track.keyframes()
         self.output = output
         self.edit_path = source if source.suffix.lower() == ".k360" else None
         self.folder = Path(folder)
@@ -60,6 +62,7 @@ class Editor:
         style.map("TButton", background=[("active", "#48535b"), ("disabled", "#2a3035")])
         style.configure("Primary.TButton", background="#78ded4", foreground="#102826")
         style.map("Primary.TButton", background=[("disabled", "#354a4b"), ("active", "#95f0e7")])
+        style.configure("Roll.TEntry", fieldbackground="#363e45", foreground="#edf1f3", insertcolor="#edf1f3")
         style.configure("TScale", background="#78ded4", troughcolor="#424b52", slidersize=18)
         style.map(
             "TCombobox", fieldbackground=[("readonly", "#363e45")], foreground=[("readonly", "#edf1f3")]
@@ -114,17 +117,30 @@ class Editor:
                 transport.columnconfigure(i, weight=int(i < columns))
 
         transport.bind("<Configure>", arrange)
+        self.pan_only = tk.BooleanVar(value=self.track.pan_only)
+        ttk.Checkbutton(
+            row(2), text="Pan only (lock pitch)", variable=self.pan_only, command=self.toggle_pan_only
+        ).pack(side="left")
+        self.roll_text = tk.StringVar()
         self.angle = {}
         for i, (name, low, high) in enumerate([("FOV", 25, 145), ("Roll", -180, 180)]):
-            line = row(2 + i)
+            line = row(3 + i)
             ttk.Label(line, text=name, width=5).pack(side="left")
             var = tk.DoubleVar()
             self.angle[name] = var
             scale = ttk.Scale(line, from_=low, to=high, variable=var, command=self.sliders)
             scale.pack(side="left", fill="x", expand=True)
-            scale.bind("<ButtonRelease-1>", lambda e: self.set_key())
-            scale.bind("<KeyRelease>", lambda e: self.set_key())
-        options = row(4)
+            commit = self.key_roll if name == "Roll" else self.set_key
+            scale.bind("<ButtonRelease-1>", lambda e, action=commit: action())
+            for key in ("Left", "Right", "Up", "Down", "Home", "End"):
+                scale.bind(f"<KeyRelease-{key}>", lambda e, action=commit: action())
+            if name == "Roll":
+                entry = ttk.Entry(line, textvariable=self.roll_text, width=6, style="Roll.TEntry")
+                entry.pack(side="left", padx=(5, 0))
+                ttk.Label(line, text="°").pack(side="left")
+                entry.bind("<Return>", lambda e: self.enter_roll())
+                ttk.Button(line, text="Key roll", command=self.enter_roll).pack(side="left")
+        options = row(5)
         ttk.Label(options, text="Output").pack(side="left")
         combo = ttk.Combobox(
             options, textvariable=self.mode, values=list(MODES), state="readonly", width=13
@@ -134,7 +150,7 @@ class Editor:
         ttk.Combobox(
             options, textvariable=self.quality, values=["Standard", "High"], state="readonly", width=9
         ).pack(side="left")
-        buttons = row(5)
+        buttons = row(6)
         self.export_button = ttk.Button(
             buttons, text="Render and import" if output else "Export MP4", command=self.export
         )
@@ -144,7 +160,7 @@ class Editor:
         self.stop = ttk.Button(buttons, text="Cancel job", command=self.stop_job, state="disabled")
         self.stop.pack(side="right")
         ttk.Label(panel, textvariable=self.status, wraplength=max(280, min(sw - 25, 700))).grid(
-            row=6, column=0, columnspan=2, sticky="w"
+            row=7, column=0, columnspan=2, sticky="w"
         )
         root.protocol("WM_DELETE_WINDOW", self.close)
         self.refresh()
@@ -156,13 +172,17 @@ class Editor:
         self.threads.append(t)
         t.start()
 
+    def show_roll_angle(self):
+        self.roll_text.set(f"{self.view.roll:.2f}".rstrip("0").rstrip("."))
+
     def refresh(self):
         self.setting = True
         self.position.set(self.frame)
         self.angle["FOV"].set(self.view.fov)
         self.angle["Roll"].set(self.view.roll)
+        self.show_roll_angle()
         self.position_label.config(
-            text=f"{float(self.frame / self.clip.fps):.1f}s  " + ("◆" if self.frame in self.keys else "")
+            text=f"{float(self.frame / self.clip.fps):.1f}s  " + ("◆" if self.frame in self.track.frames() else "")
         )
         self.setting = False
         self.request()
@@ -225,7 +245,7 @@ class Editor:
         self.refresh()
 
     def jump(self, direction):
-        after = [f for f in sorted(self.keys) if (f - self.frame) * direction > 0]
+        after = [f for f in sorted(self.track.frames()) if (f - self.frame) * direction > 0]
         if after:
             self.play = False
             self.move_to(after[0] if direction > 0 else after[-1])
@@ -240,7 +260,7 @@ class Editor:
             scale = v.fov / max(1, self.dimensions()[0])
             self.view = View(
                 wrap(v.yaw - (e.x - x) * scale),
-                max(-90, min(90, v.pitch + (e.y - y) * scale)),
+                v.pitch if self.track.pan_only else max(-90, min(90, v.pitch + (e.y - y) * scale)),
                 v.roll,
                 v.fov,
             )
@@ -264,27 +284,58 @@ class Editor:
             self.view = View(
                 self.view.yaw, self.view.pitch, self.angle["Roll"].get(), self.angle["FOV"].get()
             )
+            self.show_roll_angle()
             self.request()
 
+    def toggle_pan_only(self):
+        self.snapshot()
+        self.track.pan_only = self.pan_only.get()
+
+    def key_roll(self):
+        key = RollKey(self.view.roll)
+        if self.track.rolls.get(self.frame) != key:
+            self.snapshot()
+            self.track.rolls[self.frame] = key
+            self.keys = self.track.keyframes()
+        self.move_to(self.frame)
+
+    def enter_roll(self):
+        try:
+            angle = float(self.roll_text.get())
+            self.view = replace(self.view, roll=angle)
+        except ValueError:
+            messagebox.showerror("Roll angle", "Enter a number from −180 to 180 degrees.")
+            return
+        self.play = False
+        self.key_roll()
+
     def snapshot(self):
-        self.history = (self.history + [self.keys.copy()])[-50:]
+        self.history = (self.history + [self.track.copy()])[-50:]
         self.dirty = True
 
     def set_key(self):
-        if self.keys.get(self.frame) != self.view:
+        aim = replace(self.view, roll=0)
+        if self.track.aim.get(self.frame) != aim:
             self.snapshot()
-            self.keys[self.frame] = self.view
+            self.track.aim[self.frame] = aim
+            self.keys = self.track.keyframes()
         self.refresh()
 
     def delete_key(self):
-        if len(self.keys) > 1 and self.frame in self.keys:
+        remove_aim = self.frame in self.track.aim and len(self.track.aim) > 1
+        if remove_aim or self.frame in self.track.rolls:
             self.snapshot()
-            del self.keys[self.frame]
+            if remove_aim:
+                del self.track.aim[self.frame]
+            self.track.rolls.pop(self.frame, None)
+            self.keys = self.track.keyframes()
             self.move_to(self.frame)
 
     def undo(self):
         if self.history:
-            self.keys = self.history.pop()
+            self.track = self.history.pop()
+            self.pan_only.set(self.track.pan_only)
+            self.keys = self.track.keyframes()
             self.dirty = True
             self.move_to(self.frame)
 
@@ -301,7 +352,7 @@ class Editor:
         )
         if target:
             try:
-                save_edit(target, self.clip, self.keys, self.mode.get())
+                save_edit(target, self.clip, self.track, self.mode.get())
                 self.edit_path = Path(target)
                 self.dirty = False
                 self.status.set("Saved the camera track.")
