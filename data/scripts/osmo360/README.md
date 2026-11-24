@@ -2,6 +2,8 @@
 
 Open a dual-lens DJI Osmo 360 recording, drag to frame the shot, set camera keyframes and render it with the original audio. The editor keeps the original recording read-only.
 
+The 360 editor reports opening, first preview, playback proxy and export progress. You can keep working in the main window while it runs. When several recordings are imported together, KdenCut opens them one at a time. A completed render adds a new undoable import to its original project and folder if they are still open.
+
 ## Editing in KdenCut
 
 KdenCut builds the editor as a native C++/Qt 6 executable. Drop a recording from your file manager onto the **Project Bin**, use **Add Clip** or select the OSV through **Browse device files** or the NAS picker. KdenCut opens the 360 editor before adding the clip to the project. Scrub to a frame and drag the picture to aim. Releasing the drag records a camera keyframe. Use the FOV field or mouse wheel to set a zoom key. Use the arrow buttons to move between keys. The camera follows the shortest path between headings.

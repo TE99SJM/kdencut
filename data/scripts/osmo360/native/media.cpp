@@ -64,6 +64,7 @@ QByteArray run(const QString &program, const QStringList &args, const QString &d
         drain();
     }
     drain();
+    check(stop);
     if (p.exitStatus() != QProcess::NormalExit || p.exitCode() != 0)
         fail(errors.trimmed().isEmpty() ? program + " exited without completing." : QString::fromUtf8(errors.trimmed()));
     return data;
@@ -76,11 +77,11 @@ static QJsonObject inspect(const QString &path, QStringList flags, const Stop &s
     if (e.error || !doc.isObject()) fail("Invalid FFprobe response.");
     return doc.object();
 }
-Clip probe(const QString &path)
+Clip probe(const QString &path, const Stop &stop)
 {
     Clip c;
     c.path = QFileInfo(path).absoluteFilePath();
-    auto json = inspect(c.path, {"-show_streams", "-show_format"});
+    auto json = inspect(c.path, {"-show_streams", "-show_format"}, stop);
     QList<QJsonObject> video;
     QList<int> metadata;
     for (auto stream : json["streams"].toArray()) {
@@ -114,11 +115,12 @@ Clip probe(const QString &path)
     }
     if (!metadata.isEmpty()) {
         auto packets =
-            inspect(c.path, {"-select_streams", "d", "-read_intervals", "%+1", "-show_packets", "-show_entries", "packet=stream_index,pos,size"})["packets"]
+            inspect(c.path, {"-select_streams", "d", "-read_intervals", "%+1", "-show_packets", "-show_entries", "packet=stream_index,pos,size"}, stop)["packets"]
                 .toArray();
         QFile file(c.path);
         if (!file.open(QIODevice::ReadOnly)) fail(file.errorString());
         for (auto packet : packets) {
+            check(stop);
             auto p = packet.toObject();
             if (!metadata.contains(p["stream_index"].toInt()) || !p.contains("pos")) continue;
             int bytes = p["size"].toString().toInt();

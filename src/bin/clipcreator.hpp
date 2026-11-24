@@ -106,7 +106,7 @@ bool createClipFromFile(const QString &path, const QString &parentFolder, std::s
  */
 const QString createClipsFromList(
     const QList<QUrl> &list, bool checkRemovable, const QString &parentFolder, const std::shared_ptr<ProjectItemModel> &model, Fun &undo, Fun &redo,
-    const std::function<void(const QString &)> &readyCallBack = [](const QString &) {}, bool topLevel = true);
+    const std::function<void(const QString &)> &readyCallBack = [](const QString &) {}, bool topLevel = true, bool *queuedOsmo = nullptr);
 const QString createClipsFromList(
     const QList<QUrl> &list, bool checkRemovable, const QString &parentFolder, std::shared_ptr<ProjectItemModel> model,
     const std::function<void(const QString &)> &readyCallBack = [](const QString &) {});

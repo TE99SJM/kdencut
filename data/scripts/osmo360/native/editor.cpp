@@ -20,6 +20,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPushButton>
+#include <QProgressBar>
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QTemporaryDir>
@@ -182,6 +183,10 @@ public:
         auto *actions = row();
         button(actions, integrated ? "Render and import" : "Export MP4", [this] { exportVideo(); });
         button(actions, "Save edit…", [this] { save(); });
+        bar = new QProgressBar;
+        bar->setAccessibleName("Osmo 360 processing progress");
+        layout->addWidget(bar);
+        bar->hide();
         cancel = new QPushButton("Cancel job");
         layout->addWidget(cancel);
         cancel->hide();
@@ -190,6 +195,8 @@ public:
         layout->addWidget(status);
         connect(cancel, &QPushButton::clicked, this, [this] {
             if (workStop) workStop->store(true);
+            cancel->setEnabled(false);
+            status->setText("Cancelling…");
         });
         connect(seek, &QSlider::sliderMoved, this, [this](int n) {
             stopPlay();
@@ -267,40 +274,61 @@ public:
         pool.waitForDone();
     }
     QString result;
+    bool openFailed = false;
     bool open(const QString &path)
     {
         if (busy || !discard()) return false;
         stopPlay();
-        try {
-            auto next = openEdit(path);
-            auto tmp = std::make_shared<QTemporaryDir>();
-            if (!tmp->isValid() || !QDir(tmp->path()).mkdir("preview") || !QDir(tmp->path()).mkdir("proxy")) fail("Cannot create temporary preview directory.");
-            if (thumbStop) thumbStop->store(true);
-            edit = std::move(next);
-            folder = std::move(tmp);
-            proxy = {};
-            dirty = false;
-            history.clear();
-            result.clear();
-            dragging = false;
-            editPath = path.endsWith(".k360", Qt::CaseInsensitive) ? path : QString();
-            {
-                QSignalBlocker blocker(mode);
-                mode->setCurrentText(edit.mode);
+        beginWork("open", "Opening " + QFileInfo(path).fileName() + "…");
+        auto stop = workStop;
+        pool.start([this, path, stop] {
+            Edit next;
+            std::shared_ptr<QTemporaryDir> tmp;
+            QString error;
+            try {
+                next = openEdit(path, stop);
+                tmp = std::make_shared<QTemporaryDir>();
+                if (!tmp->isValid() || !QDir(tmp->path()).mkdir("preview") || !QDir(tmp->path()).mkdir("proxy"))
+                    fail("Cannot create temporary preview directory.");
+            } catch (const std::exception &e) {
+                error = QString::fromUtf8(e.what());
             }
-            controls->setEnabled(true);
-            seek->setRange(0, edit.clip.frames - 1);
-            canvas->image = {};
-            canvas->update();
-            setWindowTitle("Osmo 360 Editor — " + QFileInfo(edit.clip.path).fileName());
-            status->setText(edit.clip.calibration.empty() ? "Generic lens geometry" : "Factory lens calibration");
-            updateSize();
-            move(0);
-            return true;
-        } catch (const std::exception &e) {
-            QMessageBox::warning(this, "Open Osmo 360 clip", QString::fromUtf8(e.what()));
-            return false;
-        }
+            QMetaObject::invokeMethod(this, [this, next = std::move(next), tmp, stop, path, error]() mutable {
+                endWork();
+                if (stop->load() || !error.isEmpty()) {
+                    status->setText(stop->load() ? "Opening cancelled." : error);
+                    if (!ready() && !canOpen()) {
+                        if (!stop->load()) {
+                            std::fprintf(stderr, "%s\n", qPrintable(error));
+                            openFailed = true;
+                            if (!integrated) QMessageBox::warning(this, "Open Osmo 360 clip", error);
+                        }
+                        close();
+                    }
+                    return;
+                }
+                if (thumbStop) thumbStop->store(true);
+                edit = std::move(next);
+                folder = tmp;
+                proxy = {};
+                dirty = false;
+                history.clear();
+                result.clear();
+                dragging = false;
+                editPath = path.endsWith(".k360", Qt::CaseInsensitive) ? path : QString();
+                QSignalBlocker modeBlock(mode), seekBlock(seek);
+                mode->setCurrentText(edit.mode);
+                controls->setEnabled(true);
+                seek->setRange(0, edit.clip.frames - 1);
+                canvas->image = {};
+                canvas->update();
+                setWindowTitle("Osmo 360 Editor — " + QFileInfo(edit.clip.path).fileName());
+                status->setText("Preparing first preview…");
+                updateSize();
+                move(0);
+            }, Qt::QueuedConnection);
+        });
+        return true;
     }
 
 protected:
@@ -451,13 +479,48 @@ private:
                 QFileDialog::getSaveFileName(this, "Export from original lenses", suggested("-" + edit.mode.section(' ', 0, 0) + ".mp4"), "MP4 video (*.mp4)");
         if (!path.isEmpty()) background(false, QFileInfo(path).absoluteFilePath());
     }
-    void background(bool building, QString path)
+    void showProgress(const QByteArray &stage, int percent = -1)
+    {
+        if (stage == currentStage && percent == currentPercent) return;
+        currentStage = stage;
+        currentPercent = percent;
+        if (stage == "idle") {
+            bar->hide();
+        } else {
+            bar->setRange(0, percent < 0 ? 0 : 100);
+            if (percent >= 0) bar->setValue(percent);
+            bar->show();
+        }
+        if (integrated) {
+            std::fprintf(stderr, "osmo360 %s %d\n", stage.constData(), percent);
+            std::fflush(stderr);
+        } else if (!output.isEmpty() && stage == "render" && percent >= 0) {
+            // Stock Kdenlive's Media Job monitor reads MLT-style progress on stderr.
+            std::fprintf(stderr, "percentage: %d\n", percent);
+            std::fflush(stderr);
+        }
+    }
+    void beginWork(const QByteArray &stage, const QString &message)
     {
         busy = true;
         controls->setEnabled(false);
+        cancel->setEnabled(true);
         cancel->show();
         workStop = std::make_shared<std::atomic_bool>(false);
-        status->setText(building ? "Preparing 8 fps playback proxy…" : "Rendering from the original lenses…");
+        status->setText(message);
+        showProgress(stage);
+    }
+    void endWork()
+    {
+        busy = false;
+        workStop.reset();
+        controls->setEnabled(ready());
+        cancel->hide();
+        showProgress(ready() && canvas->image.isNull() && thumbnailActive ? "preview" : "idle");
+    }
+    void background(bool building, QString path)
+    {
+        beginWork(building ? "proxy" : "render", building ? "Preparing playback proxy…" : "Rendering from the original lenses…");
         auto e = edit;
         auto tmp = folder;
         auto stop = workStop;
@@ -466,11 +529,12 @@ private:
             Proxy made;
             QString error;
             auto progress = [this, building, total = e.clip.frames, fps = e.clip.fps](int n) {
-                int percent = std::clamp(int(n * 100. / (building ? std::max(1., total * 8 / fps) : total)), 0, 100);
+                if (n <= 0) return;
+                int percent = std::clamp(int(n * 100. / (building ? std::max(1., total * 8 / fps) : total)), 0, 99);
                 QMetaObject::invokeMethod(
                     this,
                     [this, percent, building] {
-                        status->setText((building ? QString("Preparing playback  ") : QString("Exporting  ")) + QString::number(percent) + "%");
+                        if (workStop && !workStop->load()) showProgress(building ? "proxy" : "render", percent);
                     },
                     Qt::QueuedConnection);
             };
@@ -485,9 +549,8 @@ private:
             QMetaObject::invokeMethod(
                 this,
                 [this, building, made, error, path] {
-                    busy = false;
-                    controls->setEnabled(true);
-                    cancel->hide();
+                    if (error.isEmpty()) showProgress(building ? "proxy" : "render", 100);
+                    endWork();
                     if (!error.isEmpty()) {
                         status->setText(error);
                         return;
@@ -508,6 +571,7 @@ private:
     void request()
     {
         if (!ready()) return;
+        if (!busy && canvas->image.isNull()) showProgress("preview");
         ++generation;
         pending = true;
         if (thumbnailActive) return;
@@ -537,10 +601,12 @@ private:
                 [this, img, error, gen, n] {
                     thumbnailActive = false;
                     if (gen == generation) {
+                        if (!busy && currentStage == "preview") showProgress("idle");
                         if (error.isEmpty()) {
                             canvas->image = img;
                             canvas->update();
-                            if (status->text().startsWith("Preview failed")) status->setText("Preview ready.");
+                            if (!busy && (status->text() == "Preparing first preview…" || status->text().startsWith("Preview failed")))
+                                status->setText(edit.clip.calibration.empty() ? "Generic lens geometry" : "Factory lens calibration");
                         } else {
                             stopPlay();
                             if (!busy) status->setText(QString("Preview failed at frame %1. ").arg(n) + error);
@@ -565,6 +631,9 @@ private:
     QList<Track> history;
     bool pending = false, thumbnailActive = false;
     quint64 generation = 0;
+    QByteArray currentStage = "idle";
+    int currentPercent = -1;
+    QProgressBar *bar;
     Canvas *canvas;
     QWidget *controls;
     QPushButton *playBtn = nullptr, *cancel;
@@ -598,9 +667,10 @@ int main(int argc, char **argv)
     }
     Editor editor(parser.value("output"), parser.isSet("integrated"));
     auto args = parser.positionalArguments();
-    if (!args.isEmpty() && !editor.open(args.first())) return 1;
     editor.show();
+    if (!args.isEmpty()) editor.open(args.first());
     app.exec();
+    if (editor.openFailed) return 1;
     if (editor.result.isEmpty()) return 2;
     auto reply = QJsonDocument(QJsonObject{{"clip", editor.result}}).toJson(QJsonDocument::Compact);
     std::fwrite(reply.constData(), 1, reply.size(), stdout);

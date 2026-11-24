@@ -23,6 +23,7 @@
 #include <QApplication>
 #include <QDomDocument>
 #include <QMimeDatabase>
+#include <QPointer>
 #include <utility>
 
 namespace {
@@ -427,9 +428,33 @@ QString ClipCreator::createTitleTemplate(const QString &path, const QString &tex
     return res ? id : QStringLiteral("-1");
 }
 
+namespace {
+void queueOsmoImport(const QString &path, const QString &folderId, const std::shared_ptr<ProjectItemModel> &model,
+                     const std::function<void(const QString &)> &ready)
+{
+    const QPointer<KdenliveDoc> document(pCore->currentDoc());
+    const auto uuid = model->uuid();
+    const std::weak_ptr<AbstractProjectItem> folder = model->getItemByBinId(folderId);
+    const auto valid = [document, uuid, folder, folderId] {
+        if (!document || document != pCore->currentDoc()) return false;
+        const auto current = pCore->projectItemModel();
+        const auto originalFolder = folder.lock();
+        return originalFolder && current && current->uuid() == uuid && current->getItemByBinId(folderId) == originalFolder;
+    };
+    KdenCut::queueOsmo360Clip(pCore->window(), path, valid, [folderId, ready](const QString &rendered) {
+        // Other edits may have happened while the camera clip was processing.
+        // Add the completed clip as a new undoable import in its original folder.
+        Fun undo = [] { return true; };
+        Fun redo = [] { return true; };
+        const auto id = ClipCreator::createClipFromFile(rendered, folderId, pCore->projectItemModel(), undo, redo, ready, true);
+        if (id != QLatin1String("-1")) pCore->pushUndo(undo, redo, i18n("Import 360 clip"));
+    });
+}
+}
+
 const QString ClipCreator::createClipsFromList(const QList<QUrl> &list, bool checkRemovable, const QString &parentFolder,
                                                const std::shared_ptr<ProjectItemModel> &model, Fun &undo, Fun &redo,
-                                               const std::function<void(const QString &)> &readyCallBack, bool topLevel)
+                                               const std::function<void(const QString &)> &readyCallBack, bool topLevel, bool *queuedOsmo)
 {
     QString createdItem;
     // Check for duplicates
@@ -550,7 +575,8 @@ const QString ClipCreator::createClipsFromList(const QList<QUrl> &list, bool che
 
                     createdItem = folderId;
                     // load subfolders
-                    const QString clipId = createClipsFromList(sublist, checkRemovable, folderId, model, undo, redo, readyCallBack, false);
+                    const QString clipId = createClipsFromList(sublist, checkRemovable, folderId, model, local_undo, local_redo, readyCallBack, false);
+                    UPDATE_UNDO_REDO_NOLOCK(local_redo, local_undo, undo, redo)
                     if (createdItem.isEmpty() && clipId != QLatin1String("-1")) {
                         createdItem = clipId;
                     }
@@ -566,8 +592,9 @@ const QString ClipCreator::createClipsFromList(const QList<QUrl> &list, bool che
                     folderId = parentFolder;
                 }
                 createdItem = folderId;
-                const QString clipId = createClipsFromList(folderFiles, checkRemovable, folderId, model, local_undo, local_redo, readyCallBack, false);
-                if (clipId.isEmpty() || clipId == QLatin1String("-1")) {
+                bool queued = false;
+                const QString clipId = createClipsFromList(folderFiles, checkRemovable, folderId, model, local_undo, local_redo, readyCallBack, false, &queued);
+                if (!queued && (clipId.isEmpty() || clipId == QLatin1String("-1"))) {
                     local_undo();
                 } else {
                     if (createdItem.isEmpty()) {
@@ -610,14 +637,6 @@ const QString ClipCreator::createClipsFromList(const QList<QUrl> &list, bool che
                 }
                 checkedDirectories << fileDir;
             }
-            const auto suffix = info.suffix().toLower();
-            if (suffix == QStringLiteral("osv") || suffix == QStringLiteral("k360")) {
-                const QString prepared = KdenCut::prepareOsmo360Clip(info.absoluteFilePath(), QApplication::activeWindow());
-                if (prepared.isEmpty()) {
-                    continue;
-                }
-                info.setFile(prepared);
-            }
             std::function<void(const QString &)> callBack = [readyCallBack](const QString &binId) {
                 if (readyCallBack) {
                     readyCallBack(binId);
@@ -637,6 +656,12 @@ const QString ClipCreator::createClipsFromList(const QList<QUrl> &list, bool che
                 pCore->displayMessage(QString(), OperationCompletedMessage, 100);
                 qDebug() << "/// PROJECT UUID MISMATCH; ABORTING";
                 return QString();
+            }
+            const auto suffix = info.suffix().toLower();
+            if (suffix == QStringLiteral("osv") || suffix == QStringLiteral("k360")) {
+                queueOsmoImport(info.absoluteFilePath(), parentFolder, model, callBack);
+                if (queuedOsmo) *queuedOsmo = true;
+                continue;
             }
             const QString clipId = ClipCreator::createClipFromFile(info.absoluteFilePath(), parentFolder, model, undo, redo, callBack);
             if (createdItem.isEmpty() && clipId != QLatin1String("-1")) {

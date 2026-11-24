@@ -42,6 +42,17 @@ int main(int argc, char **argv)
         e.track.rolls[8] = {18, false};
         expect(e.track.at(4).roll == 0 && e.track.at(5).roll == -27 && e.track.at(7).roll == -27 && e.track.at(8).roll == 18, "Roll was not held");
         saveEdit(file("camera.k360"), e);
+        // An already cancelled open must not start FFprobe for either input format.
+        const auto cancelled = std::make_shared<std::atomic_bool>(true);
+        for (const auto &path : {source, file("camera.k360")}) {
+            bool stopped = false;
+            try {
+                openEdit(path, cancelled);
+            } catch (const std::runtime_error &error) {
+                stopped = QString::fromUtf8(error.what()) == "Cancelled.";
+            }
+            expect(stopped, "Clip inspection ignored cancellation");
+        }
         auto again = openEdit(file("camera.k360"));
         expect(again.track.panOnly && again.track.at(7).roll == -27, "Track round trip failed");
         auto proxy = makeProxy(c, temp.path(), {}, {});

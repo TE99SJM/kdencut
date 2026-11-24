@@ -63,10 +63,10 @@ struct Edit
 };
 inline const QStringList modes{"Landscape", "Portrait", "Square", "360 panorama"};
 QSize outputSize(const QString &mode, bool high, int lensWidth);
-Edit openEdit(const QString &path);
+Edit openEdit(const QString &path, const Stop &stop = {});
 void saveEdit(const QString &path, const Edit &edit);
 QByteArray run(const QString &program, const QStringList &args, const QString &dir = {}, const Stop &stop = {}, const Progress &progress = {});
-Clip probe(const QString &path);
+Clip probe(const QString &path, const Stop &stop = {});
 std::vector<Lens> readCalibration(const QByteArray &packet, int width);
 void maps(const Clip &clip, int width, int lensWidth, const QString &folder, const Stop &stop);
 struct Proxy

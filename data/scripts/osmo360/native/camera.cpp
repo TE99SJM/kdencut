@@ -57,12 +57,12 @@ static double angle(QJsonValue value, double low, double high)
     if (!value.isDouble() || value.toDouble() < low || value.toDouble() > high) fail("Invalid camera angle in saved edit.");
     return value.toDouble();
 }
-Edit openEdit(const QString &path)
+Edit openEdit(const QString &path, const Stop &stop)
 {
     QFileInfo file(path);
     Edit edit;
     if (file.suffix().compare("k360", Qt::CaseInsensitive)) {
-        edit.clip = probe(path);
+        edit.clip = probe(path, stop);
         return edit;
     }
     QFile input(path);
@@ -70,7 +70,7 @@ Edit openEdit(const QString &path)
     auto doc = QJsonDocument::fromJson(input.readAll()).object();
     int version = doc["version"].toInt();
     if ((version != 1 && version != 2) || doc["source"].toString().isEmpty()) fail("Unsupported camera track.");
-    edit.clip = probe(file.dir().absoluteFilePath(doc["source"].toString()));
+    edit.clip = probe(file.dir().absoluteFilePath(doc["source"].toString()), stop);
     if (doc["fps"].toString() != edit.clip.rate || doc["frames"].toInt() != edit.clip.frames) fail("The recording no longer matches this edit.");
     edit.mode = doc["mode"].toString();
     if (!modes.contains(edit.mode)) fail("Unsupported output shape.");

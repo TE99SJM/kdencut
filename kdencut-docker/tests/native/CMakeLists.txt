@@ -58,3 +58,11 @@ foreach(target check_touch_theme check_mobile_settings check_project_settings_ui
     set_target_properties(${target} PROPERTIES AUTORCC ON)
     target_sources(${target} PRIVATE ../../../src/kdencut/controls.qrc)
 endforeach()
+
+if(UNIX)
+    add_executable(check_osmo_import check_osmo_import.cpp ../../../src/kdencut/osmo360import.cpp)
+    set_target_properties(check_osmo_import PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/osmo-import-test")
+    target_link_libraries(check_osmo_import PRIVATE Qt6::Widgets Qt6::Test KF6::I18n KF6::WidgetsAddons)
+    add_test(NAME osmo_background_import COMMAND check_osmo_import)
+    set_tests_properties(osmo_background_import PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()
