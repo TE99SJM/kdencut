@@ -20,6 +20,8 @@ SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 
 #include <KLocalizedString>
 
+#include <utility>
+
 ProxyTask::ProxyTask(const ObjectId &owner, QObject *object)
     : AbstractTask(owner, AbstractTask::PROXYJOB, object)
     , m_jobDuration(0)
@@ -257,6 +259,7 @@ void ProxyTask::run()
                                   QStringLiteral("-v"),           QStringLiteral("error"), QStringLiteral("-protocol_whitelist"),
                                   QStringLiteral("file,pipe")};
 
+        QList<QStringList> fallbackParameters;
         m_jobDuration = int(binClip->duration().seconds());
         if (binClip->hasProducerProperty(QStringLiteral("kdenlive:camcorderproxy"))) {
             // ffmpeg -an -i proxy.mp4 -vn -i original.MXF -map 0:v -map 1:a -c:v copy out.MP4
@@ -268,6 +271,7 @@ void ProxyTask::run()
             parameters << QStringLiteral("-c:v") << QStringLiteral("copy") << dest;
         } else {
             QString proxyParams;
+            bool automaticProfile = false;
             if (binClip->hasAlpha()) {
                 // check if this is a VP8/VP9 clip and enforce libvpx codec
                 proxyParams = KdenliveSettings::proxyalphaparams().simplified();
@@ -287,6 +291,7 @@ void ProxyTask::run()
                 proxyParams = pCore->currentDoc()->getDocumentProperty(QStringLiteral("proxyparams")).simplified();
                 if (proxyParams.isEmpty()) {
                     // Automatic setting, decide based on hw support
+                    automaticProfile = true;
                     proxyParams = pCore->currentDoc()->getAutoProxyProfile();
                 } else {
                     // Sanitize parameters
@@ -322,7 +327,8 @@ void ProxyTask::run()
                 proxyParams.replace(QStringLiteral(",format=nv12,hwupload"), QString());
                 proxyParams.replace(QStringLiteral("h264_vaapi"), QStringLiteral("libx264"));
             }
-            bool nvenc = proxyParams.contains(QStringLiteral("%nvcodec"));
+            const bool nvenc = proxyParams.contains(QStringLiteral("%nvcodec"));
+            const bool automaticNvidia = automaticProfile && nvenc && proxyParams.contains(QStringLiteral("-c:v h264_nvenc"));
             if (nvenc) {
                 QString pix_fmt = binClip->videoCodecProperty(QStringLiteral("pix_fmt"));
                 QString codec = binClip->videoCodecProperty(QStringLiteral("name"));
@@ -343,7 +349,7 @@ void ProxyTask::run()
                     int h = 0;
                     int oW = binClip->getProducerProperty(QStringLiteral("meta.media.width")).toInt();
                     int oH = binClip->getProducerProperty(QStringLiteral("meta.media.height")).toInt();
-                    if (oH > 0) {
+                    if (oH > 0 && oW > 0) {
                         h = w * oH / oW;
                     } else {
                         h = int(w / pCore->getCurrentDar());
@@ -375,9 +381,25 @@ void ProxyTask::run()
                 parameters << QStringLiteral("-noautorotate");
                 proxyParams.replace(QStringLiteral("-noautorotate"), QString());
             }
+            if (automaticNvidia) {
+                QStringList softwareInput = parameters;
+                softwareInput << QStringLiteral("-i") << source << QStringLiteral("-vf") << QStringLiteral("scale=%1:-2").arg(proxyResize)
+                              << QStringLiteral("-pix_fmt") << QStringLiteral("yuv420p") << QStringLiteral("-fps_mode") << QStringLiteral("cfr")
+                              << QStringLiteral("-g") << QStringLiteral("2") << QStringLiteral("-bf") << QStringLiteral("0")
+                              << QStringLiteral("-c:a") << QStringLiteral("aac") << QStringLiteral("-ab") << QStringLiteral("128k");
+                if (proxyParams.contains(QStringLiteral("_cuvid"))) {
+                    fallbackParameters << (softwareInput + QStringList{QStringLiteral("-c:v"), QStringLiteral("h264_nvenc")});
+                } else {
+                    // This source already needs software decoding. Resize it before uploading for encode.
+                    parameters = softwareInput + QStringList{QStringLiteral("-c:v"), QStringLiteral("h264_nvenc")};
+                    proxyParams.clear();
+                }
+                fallbackParameters << (softwareInput + QStringList{QStringLiteral("-c:v"), QStringLiteral("libx264"), QStringLiteral("-preset"),
+                                                                    QStringLiteral("ultrafast"), QStringLiteral("-crf"), QStringLiteral("20")});
+            }
             if (proxyParams.contains(QLatin1String("-i "))) {
                 // we have some pre-filename parameters, filename will be inserted later
-            } else {
+            } else if (!proxyParams.isEmpty() || !automaticNvidia) {
                 parameters << QStringLiteral("-i") << source;
             }
             const QStringList params = proxyParams.split(QLatin1Char(' '), Qt::SkipEmptyParts);
@@ -393,6 +415,7 @@ void ProxyTask::run()
                 parameters << QStringLiteral("-flags") << QStringLiteral("+ildct+ilme") << QStringLiteral("-top") << QStringLiteral("-1");
             }
 
+            const int streamOptionsStart = parameters.size();
             // Make sure we keep the stream order
             parameters << QStringLiteral("-sn") << QStringLiteral("-dn");
             if (binClip->hasProducerProperty(QStringLiteral("kdenlive:coverartstream"))) {
@@ -409,17 +432,47 @@ void ProxyTask::run()
             // Drop unknown streams instead of aborting
             parameters << QStringLiteral("-ignore_unknown");
             parameters << dest;
+            const QStringList streamOptions = parameters.mid(streamOptionsStart);
+            for (auto &fallback : fallbackParameters) {
+                fallback += streamOptions;
+            }
             qDebug() << "/// FULL PROXY PARAMS:\n" << parameters << "\n------";
         }
         m_jobProcess = new QProcess();
         QObject::connect(m_jobProcess, &QProcess::readyReadStandardError, this, &ProxyTask::processLogInfo);
         QObject::connect(this, &ProxyTask::jobCanceled, m_jobProcess, &QProcess::kill, Qt::DirectConnection);
-        m_jobProcess->start(KdenliveSettings::ffmpegpath(), parameters, QIODevice::ReadOnly);
-        AbstractTask::setPreferredPriority(m_jobProcess->processId());
-        m_jobProcess->waitForFinished(-1);
-        result = m_jobProcess->exitStatus() == QProcess::NormalExit && m_jobProcess->exitCode() == 0;
-        if (!result && !m_isCanceled) {
-            m_logDetails.append(QString::fromUtf8(m_jobProcess->readAllStandardError()));
+        const auto encode = [this](const QStringList &args) {
+            if (m_isCanceled) {
+                return false;
+            }
+            m_jobProcess->start(KdenliveSettings::ffmpegpath(), args, QIODevice::ReadOnly);
+            const bool started = m_jobProcess->waitForStarted();
+            if (started) {
+                if (m_isCanceled) {
+                    m_jobProcess->kill();
+                }
+                AbstractTask::setPreferredPriority(m_jobProcess->processId());
+                m_jobProcess->waitForFinished(-1);
+            }
+            if (started && m_jobProcess->exitStatus() == QProcess::NormalExit && m_jobProcess->exitCode() == 0) {
+                return true;
+            }
+            if (!m_isCanceled) {
+                if (!started) {
+                    m_logDetails.append(m_jobProcess->errorString() + QLatin1Char('\n'));
+                }
+                m_logDetails.append(QString::fromUtf8(m_jobProcess->readAllStandardError()));
+            }
+            return false;
+        };
+        result = encode(parameters);
+        for (const auto &fallback : std::as_const(fallbackParameters)) {
+            if (result || m_isCanceled) {
+                break;
+            }
+            QFile::remove(dest);
+            m_progress = 0;
+            result = encode(fallback);
         }
         m_jobProcess->deleteLater();
     }
